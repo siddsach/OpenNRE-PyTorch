@@ -60,8 +60,8 @@ class Config(object):
 		self.pretrain_model = None
 		self.trainModel = None
 		self.testModel = None
-		self.batch_size = 32
-		self.word_size = 50
+		self.batch_size = 75
+		self.word_size = 300
 		self.window_size = 3
 		self.epoch_range = None
 		self.loss = nn.CrossEntropyLoss()
@@ -143,7 +143,7 @@ class Config(object):
 			self.data_test_label = np.load(os.path.join(self.data_path, 'test_ins_label.npy'))
 			self.data_test_scope = np.load(os.path.join(self.data_path, 'test_ins_scope.npy'))
 		print("Finish reading")
-		self.test_batches = len(self.data_test_label) / self.batch_size
+		self.test_batches = len(self.data_test_label) // self.batch_size
 		if len(self.data_test_label) % self.batch_size != 0:
 			self.test_batches += 1
 
@@ -212,8 +212,10 @@ class Config(object):
 		scope = self.batch_scope
 		attention_query = to_var(self.batch_attention_query)
 		label = to_var(self.batch_label)
-		GPUtil.showUtilization()
 		self.optimizer.zero_grad()
+		args = [word, pos1, pos2, mask, scope]
+		print([x.shape for x in args if type(x) != list])
+		print([(len(x), len(x[0])) for x in args if type(x) != list])
 		logits = self.trainModel(word, pos1, pos2, mask, scope, attention_query, label)
 		loss = self.loss(logits, label)
 		_, output = torch.max(logits, dim = 1)
@@ -221,20 +223,24 @@ class Config(object):
 		loss.backward()
 		self.optimizer.step()
 		for i, prediction in enumerate(output):
-			if self.batch_label[i] == 0:
-				self.acc_NA.add(prediction == self.batch_label[i])
+			if label[i] == 0:
+				self.acc_NA.add(prediction == label[i])
 			else:
-				self.acc_not_NA.add(prediction == self.batch_label[i])
-			self.acc_total.add(prediction == self.batch_label[i])
+                                b = prediction == label[i]
+                                self.acc_not_NA.add(b)
+			self.acc_total.add(prediction == label[i])
 		return loss.data[0]
 
 	def test_one_step(self):
-		self.testModel.embedding.word = to_var(self.batch_word)
-		self.testModel.embedding.pos1 = to_var(self.batch_pos1)
-		self.testModel.embedding.pos2 = to_var(self.batch_pos2)
-		self.testModel.encoder.mask = to_var(self.batch_mask)
-		self.testModel.selector.scope = self.batch_scope
-		return self.testModel.test()
+		word = to_var(self.batch_word)
+		pos1 = to_var(self.batch_pos1)
+		pos2 = to_var(self.batch_pos2)
+		mask = to_var(self.batch_mask)
+		scope = self.batch_scope
+		args = [word, pos1, pos2, mask, scope]
+		print([x.shape for x in args if type(x) != list])
+		print([(len(x), len(x[0])) for x in args if type(x) != list])
+		return self.testModel.test(word, pos1, pos2, mask, scope)
 
 	def train(self):
 		if not os.path.exists(self.checkpoint_dir):
@@ -253,7 +259,7 @@ class Config(object):
 				self.get_train_batch(batch)
 				loss = self.train_one_step()
 				time_str = datetime.datetime.now().isoformat()
-				sys.stdout.write("epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (epoch, batch, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(), self.acc_total.get()))
+				sys.stdout.write("\n\nepoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (epoch, batch, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(), self.acc_total.get()))
 				sys.stdout.flush()
 			if (epoch + 1) % self.save_epoch == 0:
 				print('Epoch ' + str(epoch) + ' has finished')
@@ -285,8 +291,11 @@ class Config(object):
 			test_score = test_score + batch_score
 		test_result = []
 		for i in range(len(test_score)):
-			for j in range(1, len(test_score[i])):
-				test_result.append([self.data_test_label[i][j], test_score[i][j]])
+			#for j in range(1, len(test_score[i])):
+			for j in range(1, self.data_test_label[1])):
+				dts = self.data_test_label[i][j]
+				ts = test_score[i][j]
+				test_result.append([dts, ts])
 		test_result = sorted(test_result, key = lambda x: x[1])
 		test_result = test_result[::-1]
 		pr_x = []

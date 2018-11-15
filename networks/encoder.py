@@ -46,7 +46,7 @@ class PCNN(nn.Module):
 	def forward(self, embedding, mask):
 		embedding = torch.unsqueeze(embedding, dim = 1)
 		x = self.cnn(embedding)
-		x = self.pooling(x, self.mask, self.config.hidden_size)
+		x = self.pooling(x, mask, self.config.hidden_size)
 		return self.activation(x)
 
 class CNN(nn.Module):

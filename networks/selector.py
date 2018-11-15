@@ -47,7 +47,7 @@ class Attention(Selector):
 		stack_repre = self.dropout(stack_repre)
 		logits = self.get_logits(stack_repre)
 		return logits
-	def test(self, x, scope, attention_query=None, label=None):
+	def test(self, x, scope):
 		attention_logit = self._attention_test_logit(x)
 		tower_output = []
 		for i in range(len(scope) - 1):
@@ -71,7 +71,7 @@ class One(Selector):
 			k = k[label[i]]
 			tower_logits.append(logits[k])
 		return torch.cat(tower_logits, 0)
-	def test(self, x, scope, attention_query=None, label=None):
+	def test(self, x, scope):
 		tower_score = []
 		for i in range(len(scope) - 1):
 			sen_matrix = x[scope[i] : scope[i + 1]]
@@ -93,7 +93,7 @@ class Average(Selector):
 		stack_repre = self.dropout(stack_repre)
 		logits = self.get_logits(stack_repre)
 		return logits
-	def test(self, x, scope, attention_query=None, label=None):
+	def test(self, x, scope):
 		tower_repre = []
 		for i in range(len(scope) - 1):
 			sen_matrix = x[scope[i] : scope[i + 1]]

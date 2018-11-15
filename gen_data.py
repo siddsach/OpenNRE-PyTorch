@@ -2,7 +2,7 @@ import numpy as np
 import os
 import json
 
-in_path = "./raw_data/"
+in_path = "./prescription_reasons/"
 out_path = "./data"
 case_sensitive = False
 if not os.path.exists('./data'):
@@ -25,12 +25,12 @@ def find_pos(sentence, head, tail):
 		else:
 			p += 1
 		return p
-		
-	sentence = ' '.join(sentence.split())	
+
+	sentence = ' '.join(sentence.split())
 	p1 = find(sentence, head)
 	p2 = find(sentence, tail)
 	words = sentence.split()
-	cur_pos = 0 
+	cur_pos = 0
 	pos1 = -1
 	pos2 = -1
 	for i, word in enumerate(words):
@@ -40,7 +40,7 @@ def find_pos(sentence, head, tail):
 			pos2 = i
 		cur_pos += len(word) + 1
 	return pos1, pos2
-		
+
 def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case_sensitive = False, is_training = True):
 	if file_name is None or not os.path.isfile(file_name):
 		raise Exception("[ERROR] Data file doesn't exist")
@@ -58,7 +58,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 	print("Loading rel2id file...")
 	rel2id = json.load(open(rel2id_file_name, "r"))
 	print("Finish loading")
-	
+
 	if not case_sensitive:
 		print("Eliminating case sensitive problem...")
 		for i in ori_data:
@@ -68,7 +68,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 		for i in ori_word_vec:
 			i['word'] = i['word'].lower()
 		print("Finish eliminating")
-	
+
 	# vec
 	print("Building word vector matrix and mapping...")
 	word2id = {}
@@ -84,12 +84,12 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 	word_vec_mat.append(np.zeros(word_size, dtype = np.float32))
 	word_vec_mat = np.array(word_vec_mat, dtype = np.float32)
 	print("Finish building")
-	
+
 	# sorting
 	print("Sorting data...")
 	ori_data.sort(key = lambda a: a['head']['id'] + '#' + a['tail']['id'] + '#' + a['relation'])
 	print("Finish sorting")
-	
+
 	sen_tot = len(ori_data)
 	sen_word = np.zeros((sen_tot, max_length), dtype = np.int64)
 	sen_pos1 = np.zeros((sen_tot, max_length), dtype = np.int64)
@@ -104,7 +104,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 		if  i%1000 == 0:
 			print i
 		sen = ori_data[i]
-		# sen_label 
+		# sen_label
 		if sen['relation'] in rel2id:
 			sen_label[i] = rel2id[sen['relation']]
 		else:
@@ -143,8 +143,8 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 			elif j - pos_max <= 0:
 				sen_mask[i][j] = [0, 100, 0]
 			else:
-				sen_mask[i][j] = [0, 0, 100]	
-		# bag_scope	
+				sen_mask[i][j] = [0, 0, 100]
+		# bag_scope
 		if is_training:
 			tup = (sen['head']['id'], sen['tail']['id'], sen['relation'])
 		else:
@@ -184,7 +184,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 	bag_label = np.array(bag_label, dtype = np.int64)
 	ins_scope = np.array(ins_scope, dtype = np.int64)
 	ins_label = np.array(ins_label, dtype = np.int64)
-	
+
 	# saving
 	print("Saving files")
 	if is_training:
@@ -200,7 +200,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
 	np.save(os.path.join(out_path, name_prefix + '_bag_scope.npy'), bag_scope)
 	np.save(os.path.join(out_path, name_prefix + '_ins_label.npy'), ins_label)
 	np.save(os.path.join(out_path, name_prefix + '_ins_scope.npy'), ins_scope)
-	print("Finish saving")		
+	print("Finish saving")
 
 init(train_file_name, word_file_name, rel_file_name, max_length = 120, case_sensitive = False, is_training = True)
 init(test_file_name, word_file_name, rel_file_name, max_length = 120, case_sensitive = False, is_training = False)
