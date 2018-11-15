@@ -7,7 +7,6 @@ from torch.autograd import Variable
 from networks.embedding import *
 from networks.encoder import *
 from networks.selector import *
-from networks.classifier import *
 
 class Model(nn.Module):
 	def __init__(self, config):
@@ -16,16 +15,13 @@ class Model(nn.Module):
 		self.embedding = Embedding(config)
 		self.encoder = None
 		self.selector = None
-		self.classifier = Classifier(config)
-	def forward(self):
-		embedding = self.embedding()
-		sen_embedding = self.encoder(embedding)
-		logits = self.selector(sen_embedding)
-		return self.classifier(logits)
-	def test(self):
-		embedding = self.embedding()
-		sen_embedding = self.encoder(embedding)
-		return self.selector.test(sen_embedding)
+	def forward(self, word, pos1, pos2, mask, scope, attention_query, label):
+		embedding = self.embedding(word, pos1, pos2)
+		sen_embedding = self.encoder(embedding, mask)
+		logits = self.selector(sen_embedding, scope, attention_query, label)
+		return logits
 
-
-
+	def test(self, word, pos1, pos2, mask, scope):
+		embedding = self.embedding(word, pos1, pos2)
+		sen_embedding = self.encoder(embedding, mask)
+		return self.selector.test(sen_embedding, scope)
