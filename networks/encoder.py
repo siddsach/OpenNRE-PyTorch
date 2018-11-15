@@ -17,7 +17,7 @@ class _CNN(nn.Module):
 		self.stride = (1, 1)
 		self.padding = (1, 0)
 		self.cnn = nn.Conv2d(self.in_channels, self.out_channels, self.kernel_size, self.stride, self.padding)
-	def forward(self, embedding):
+	def forward(self, embedding, mask=None):
 		return self.cnn(embedding)
 
 class _PiecewisePooling(nn.Module):
@@ -40,11 +40,10 @@ class PCNN(nn.Module):
 	def __init__(self, config):
 		super(PCNN, self).__init__()
 		self.config = config
-		self.mask = None
 		self.cnn = _CNN(config)
 		self.pooling = _PiecewisePooling()
 		self.activation = nn.ReLU()
-	def forward(self, embedding):
+	def forward(self, embedding, mask):
 		embedding = torch.unsqueeze(embedding, dim = 1)
 		x = self.cnn(embedding)
 		x = self.pooling(x, self.mask, self.config.hidden_size)
@@ -57,8 +56,8 @@ class CNN(nn.Module):
 		self.cnn = _CNN(config)
 		self.pooling = _MaxPooling()
 		self.activation = nn.ReLU()
-	def forward(self, embedding):
+	def forward(self, embedding, mask=None):
 		embedding = torch.unsqueeze(embedding, dim = 1)
 		x = self.cnn(embedding)
 		x = self.pooling(x, self.config.hidden_size)
-		return self.activation(x)	
+		return self.activation(x)
