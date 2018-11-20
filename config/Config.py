@@ -230,6 +230,8 @@ class Config(object):
 
     def test_one_step(self):
         word = to_var(self.batch_word)
+        print('WORD')
+        print(word)
         pos1 = to_var(self.batch_pos1)
         pos2 = to_var(self.batch_pos2)
         mask = to_var(self.batch_mask)
