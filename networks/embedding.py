@@ -9,14 +9,32 @@ class Embedding(nn.Module):
     def __init__(self, config):
         super(Embedding, self).__init__()
         self.config = config
+        if config.embed_pos:
+            self.pos_embedding = PositionEmbedding(config)
+        if config.embed_char:
+            self.char_embedding = CharacterEmbedding(config)
         self.word_embedding = nn.Embedding(self.config.data_word_vec.shape[0], self.config.data_word_vec.shape[1])
-        self.pos1_embedding = nn.Embedding(self.config.pos_num, self.config.pos_size, padding_idx = 0)
-        self.pos2_embedding = nn.Embedding(self.config.pos_num, self.config.pos_size, padding_idx = 0)
         self.init_word_weights()
-        self.init_pos_weights()
 
     def init_word_weights(self):
         self.word_embedding.weight.data.copy_(torch.from_numpy(self.config.data_word_vec))
+
+    def forward(self, word, pos1, pos2, chars):
+        word_emb = self.word_embedding(word)
+        if self.pos_embedding is not None:
+            pos_emb = self.pos_embedding(pos1, pos2)
+        if self.char_embedding is not None:
+            char_emb = self.char_embedding(chars)
+        embedding = torch.cat((word_emb, pos_emb, char_emb), dim = 2)
+        return embedding
+
+class PositionEmbedding(nn.Module):
+    def __init__(self, config):
+        super(PositionEmbedding, self).__init__()
+        self.config = config
+        self.pos1_embedding = nn.Embedding(self.config.pos_num, self.config.pos_size, padding_idx = 0)
+        self.pos2_embedding = nn.Embedding(self.config.pos_num, self.config.pos_size, padding_idx = 0)
+        self.init_pos_weights()
 
     def init_pos_weights(self):
         nn.init.xavier_uniform(self.pos1_embedding.weight.data)
@@ -25,9 +43,30 @@ class Embedding(nn.Module):
         nn.init.xavier_uniform(self.pos2_embedding.weight.data)
         if self.pos2_embedding.padding_idx is not None:
             self.pos2_embedding.weight.data[self.pos2_embedding.padding_idx].fill_(0)
-    def forward(self, word, pos1, pos2):
-        word_emb = self.word_embedding(word)
+    def forward(self, pos1, pos2):
         pos1_emb = self.pos1_embedding(pos1)
         pos2_emb = self.pos2_embedding(pos2)
-        embedding = torch.cat((word_emb, pos1_emb, pos2_emb), dim = 2)
+        embedding = torch.cat((pos1_emb, pos2_emb), dim = 2)
         return embedding
+
+class CharacterEmbedding(nn.Module):
+    def __init__(self, config):
+        super(CharacterEmbedding, self).__init__()
+        self.config = config
+        self.in_channels = 10
+        self.char_embed = nn.Embedding(self.config.num_chars, self.in_channels)
+        self.kernel_size = self.config.char_window_size
+        self.out_channels = self.config.char_size
+        self.padding = self.kernel_size
+        self.cnn = nn.Conv1d(self.in_channels, self.out_channels, self.kernel_size, padding=self.padding)
+        self.pooling = nn.MaxPool1d(self.config.max_word_length)
+        self.activation = nn.ReLU()
+
+    def forward(self, chars):
+        embed = chars.view(chars.size(0)*chars.size(1), chars.size(2))
+        embed = self.char_embed(embed).transpose(1, 2)
+        embed = self.cnn(embed)
+        embed = self.pooling(embed).reshape(chars.size(0), chars.size(1), -1)
+        embed = self.activation(embed)
+        return embed
+

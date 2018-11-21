@@ -15,13 +15,13 @@ class Model(nn.Module):
         self.embedding = Embedding(config)
         self.encoder = None
         self.selector = None
-    def forward(self, word, pos1, pos2, mask, scope, attention_query, label):
-        embedding = self.embedding(word, pos1, pos2)
+    def forward(self, word, pos1, pos2, chars, mask, scope, attention_query, label):
+        embedding = self.embedding(word, pos1, pos2, chars)
         sen_embedding = self.encoder(embedding, mask)
         logits = self.selector(sen_embedding, scope, attention_query, label)
         return logits
 
-    def test(self, word, pos1, pos2, mask, scope):
-        embedding = self.embedding(word, pos1, pos2)
+    def test(self, word, pos1, pos2, chars, mask, scope):
+        embedding = self.embedding(word, pos1, pos2, chars)
         sen_embedding = self.encoder(embedding, mask)
         return self.selector.test(sen_embedding, scope)

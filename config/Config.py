@@ -13,7 +13,10 @@ import sklearn.metrics
 from tqdm import tqdm
 
 def to_var(x):
-    return Variable(torch.from_numpy(x).cuda())
+    if torch.cuda.is_available():
+        return Variable(torch.from_numpy(x).cuda())
+    else:
+        return Variable(torch.from_numpy(x))
 
 class Accuracy(object):
     def __init__(self):
@@ -40,12 +43,18 @@ class Config(object):
         self.data_path = './data'
         self.use_bag = True
         self.use_gpu = True
+        self.embed_pos = True
+        self.embed_char = True
         self.is_training = True
         self.max_length = 120
         self.pos_num = 2 * self.max_length
         self.num_classes = 4
         self.hidden_size = 230
         self.pos_size = 5
+        self.char_size = 100
+        self.char_window_size = 3
+        self.num_chars = 63
+        self.max_word_length = 50
         self.max_epoch = 15
         self.opt_method = 'SGD'
         self.optimizer = None
@@ -114,6 +123,7 @@ class Config(object):
         self.data_train_word = np.load(os.path.join(self.data_path, 'train_word.npy'))
         self.data_train_pos1 = np.load(os.path.join(self.data_path, 'train_pos1.npy'))
         self.data_train_pos2 = np.load(os.path.join(self.data_path, 'train_pos2.npy'))
+        self.data_train_chars = np.load(os.path.join(self.data_path, 'train_chars.npy'))
         self.data_train_mask = np.load(os.path.join(self.data_path, 'train_mask.npy'))
         if self.use_bag:
             self.data_query_label = np.load(os.path.join(self.data_path, 'train_ins_label.npy'))
@@ -134,6 +144,7 @@ class Config(object):
         self.data_test_word = np.load(os.path.join(self.data_path, 'test_word.npy'))
         self.data_test_pos1 = np.load(os.path.join(self.data_path, 'test_pos1.npy'))
         self.data_test_pos2 = np.load(os.path.join(self.data_path, 'test_pos2.npy'))
+        self.data_test_chars = np.load(os.path.join(self.data_path, 'test_chars.npy'))
         self.data_test_mask = np.load(os.path.join(self.data_path, 'test_mask.npy'))
         if self.use_bag:
             self.data_test_label = np.load(os.path.join(self.data_path, 'test_bag_label.npy'))
@@ -154,8 +165,8 @@ class Config(object):
         self.trainModel = self.model(config = self)
         if self.pretrain_model != None:
             self.trainModel.load_state_dict(torch.load(self.pretrain_model))
-        print(self.trainModel)
-        self.trainModel.cuda()
+        if torch.cuda.is_available():
+            self.trainModel.cuda()
         if self.optimizer != None:
             pass
         elif self.opt_method == "Adagrad" or self.opt_method == "adagrad":
@@ -186,6 +197,7 @@ class Config(object):
         self.batch_word = self.data_train_word[index, :]
         self.batch_pos1 = self.data_train_pos1[index, :]
         self.batch_pos2 = self.data_train_pos2[index, :]
+        self.batch_chars = self.data_train_chars[index, :]
         self.batch_mask = self.data_train_mask[index, :]
         self.batch_label = np.take(self.data_train_label, self.train_order[batch * self.batch_size : (batch + 1) * self.batch_size], axis = 0)
         self.batch_attention_query = self.data_query_label[index]
@@ -201,10 +213,12 @@ class Config(object):
         self.batch_word = self.data_test_word[index, :]
         self.batch_pos1 = self.data_test_pos1[index, :]
         self.batch_pos2 = self.data_test_pos2[index, :]
+        self.batch_chars = self.data_test_chars[index, :]
         self.batch_mask = self.data_test_mask[index, :]
         self.batch_scope = scope
     def train_one_step(self):
         word = to_var(self.batch_word)
+        chars = to_var(self.batch_chars)
         pos1 = to_var(self.batch_pos1)
         pos2 = to_var(self.batch_pos2)
         mask = to_var(self.batch_mask)
@@ -213,7 +227,7 @@ class Config(object):
         label = to_var(self.batch_label)
         self.optimizer.zero_grad()
         args = [word, pos1, pos2, mask, scope]
-        logits = self.trainModel(word, pos1, pos2, mask, scope, attention_query, label)
+        logits = self.trainModel(word, pos1, pos2, chars, mask, scope, attention_query, label)
         loss = self.loss(logits, label)
         _, output = torch.max(logits, dim = 1)
         loss.backward()
@@ -230,14 +244,12 @@ class Config(object):
 
     def test_one_step(self):
         word = to_var(self.batch_word)
-        print('WORD')
-        print(word)
+        chars = to_var(self.batch_chars)
         pos1 = to_var(self.batch_pos1)
         pos2 = to_var(self.batch_pos2)
         mask = to_var(self.batch_mask)
         scope = self.batch_scope
-        args = [word, pos1, pos2, mask, scope]
-        return self.testModel.test(word, pos1, pos2, mask, scope)
+        return self.testModel.test(word, pos1, pos2, chars, mask, scope)
 
     def train(self):
         if not os.path.exists(self.checkpoint_dir):

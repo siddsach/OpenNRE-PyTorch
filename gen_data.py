@@ -70,14 +70,17 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
         print("Finish eliminating")
 
     # vec
-    print("Building word vector matrix and mapping...")
+    print("Building word vector matrix and word/char mapping...")
+    chars = set()
     word2id = {}
     word_vec_mat = []
     word_size = len(ori_word_vec[0]['vec'])
     print("Got {} words of {} dims".format(len(ori_word_vec), word_size))
     for i in ori_word_vec:
+        chars = chars.union(set(list(i['word'])))
         word2id[i['word']] = len(word2id)
         word_vec_mat.append(i['vec'])
+    char2id = {char:idx for idx, char in enumerate(chars)}
     word2id['UNK'] = len(word2id)
     word2id['BLANK'] = len(word2id)
     word_vec_mat.append(np.random.normal(loc = 0, scale = 0.05, size = word_size))
@@ -90,8 +93,10 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
     ori_data.sort(key = lambda a: a['head']['id'] + '#' + a['tail']['id'] + '#' + a['relation'])
     print("Finish sorting")
 
+    max_word_length = 50
     sen_tot = len(ori_data)
     sen_word = np.zeros((sen_tot, max_length), dtype = np.int64)
+    sen_char = np.zeros((sen_tot, max_length, max_word_length), dtype = np.int64)
     sen_pos1 = np.zeros((sen_tot, max_length), dtype = np.int64)
     sen_pos2 = np.zeros((sen_tot, max_length), dtype = np.int64)
     sen_mask = np.zeros((sen_tot, max_length, 3), dtype = np.float32)
@@ -102,7 +107,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
     bag_key = []
     for i in range(len(ori_data)):
         if  i%1000 == 0:
-            print i
+            print(i)
         sen = ori_data[i]
         # sen_label
         if sen['relation'] in rel2id:
@@ -117,6 +122,8 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
             if j < max_length:
                 if word in word2id:
                     sen_word[i][j] = word2id[word]
+                    word_len = min(len(word), max_word_length)
+                    sen_char[i][j][:word_len] = [char2id[char] for char in word[:word_len]]
                 else:
                     sen_word[i][j] = word2id['UNK']
         for j in range(j + 1, max_length):
@@ -193,6 +200,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length = 120, case
         name_prefix = "test"
     np.save(os.path.join(out_path, 'vec.npy'), word_vec_mat)
     np.save(os.path.join(out_path, name_prefix + '_word.npy'), sen_word)
+    np.save(os.path.join(out_path, name_prefix + '_chars.npy'), sen_char)
     np.save(os.path.join(out_path, name_prefix + '_pos1.npy'), sen_pos1)
     np.save(os.path.join(out_path, name_prefix + '_pos2.npy'), sen_pos2)
     np.save(os.path.join(out_path, name_prefix + '_mask.npy'), sen_mask)
