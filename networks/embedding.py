@@ -63,9 +63,16 @@ class CharacterEmbedding(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self, chars):
+        mask = chars != 0
         embed = chars.view(chars.size(0)*chars.size(1), chars.size(2))
+        mask = mask.view(chars.size(0)*chars.size(1), chars.size(2))
         embed = self.char_embed(embed).transpose(1, 2)
+        embed.masked_fill_(mask.unsqueeze(1),0)
         embed = self.cnn(embed)
+        front_mask = torch.ones((mask.size(0), self.padding-1)).long()
+        back_mask = torch.zeros((mask.size(0), self.padding-1)).long()
+        mask = torch.cat([front_mask, mask.long(), back_mask], dim=1)
+        embed = embed.masked_fill_(mask.byte().unsqueeze(1),0)
         embed = self.pooling(embed).reshape(chars.size(0), chars.size(1), -1)
         embed = self.activation(embed)
         return embed
