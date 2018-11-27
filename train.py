@@ -12,7 +12,7 @@ import argparse
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_name', type = str, default = 'pcnn_att', help = 'name of the model')
+parser.add_argument('--model_name', type = str, default = 'cnn_ave', help = 'name of the model')
 args = parser.parse_args()
 model = {
 	'pcnn_att': models.PCNN_ATT,
@@ -20,7 +20,9 @@ model = {
 	'pcnn_ave': models.PCNN_AVE,
 	'cnn_att': models.CNN_ATT,
 	'cnn_one': models.CNN_ONE,
-	'cnn_ave': models.CNN_AVE
+	'cnn_ave': models.CNN_AVE,
+	'rnn_one': models.RNN_ONE,
+	'rnn_ave': models.RNN_AVE
 }
 con = config.Config()
 con.set_max_epoch(15)

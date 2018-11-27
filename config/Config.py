@@ -73,6 +73,13 @@ class Config(object):
         self.window_size = 3
         self.epoch_range = None
         self.loss = nn.CrossEntropyLoss()
+
+        self.embed_size = self.word_size
+        if self.embed_pos:
+            self.embed_size += (self.pos_size * 2)
+        if self.embed_char:
+            self.embed_size += self.char_size
+
     def set_data_path(self, data_path):
         self.data_path = data_path
     def set_max_length(self, max_length):

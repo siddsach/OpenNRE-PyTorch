@@ -5,3 +5,5 @@ from .CNN_AVE import CNN_AVE
 from .PCNN_AVE import PCNN_AVE
 from .CNN_ONE import CNN_ONE
 from .PCNN_ONE import PCNN_ONE
+from .RNN_ONE import RNN_ONE
+from .RNN_AVE import RNN_AVE

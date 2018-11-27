@@ -61,3 +61,13 @@ class CNN(nn.Module):
         x = self.cnn(embedding)
         x = self.pooling(x, self.config.hidden_size)
         return self.activation(x)
+
+class MyRNN(nn.Module):
+    def __init__(self, config):
+        super(MyRNN, self).__init__()
+        self.config = config
+        self.rnn = nn.GRU(input_size=self.config.embed_size, hidden_size=self.config.hidden_size, batch_first=True)
+
+    def forward(self, embedding, mask):
+        _, hidden = self.rnn(embedding)
+        return torch.squeeze(hidden)
