@@ -3,9 +3,12 @@ from moana.dataset.repo import DatasetRepo
 from mobiuscore.doc.structures.sentence import Sentence
 import spacy
 import json
-from torchtext.data import TabularDataset, Field
+from torchtext.data import BucketIterator, Dataset, Field, NestedField, Example
+from torchtext.vocab import Vocab
+from collections import Counter
+import pickle
 
-MIMIC_DATASET = 'n2c2/test/tokenized_spacy'
+MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
                  ('DURATION', 'DRUG'): 'DURATION-DRUG',
@@ -15,10 +18,6 @@ MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('ROUTE', 'DRUG'): 'ROUTE-DRUG',
                  ('STRENGTH', 'DRUG'): 'STRENGTH-DRUG'}
 
-NLP = spacy.load('en_core_web_sm')
-
-def spacy_get_vector(word):
-    return NLP(word).vector.tolist()
 
 def find_pos(sentence, head, tail):
     # find index of entity
@@ -52,12 +51,13 @@ def find_pos(sentence, head, tail):
         cur_pos += len(word) + 1
     return pos1, pos2
 
-def get_mobius_dataset(dataset_name, grammar, get_vector=spacy_get_vector, verbose=True):
+def get_mobius_dataset(dataset_name, grammar, verbose=True):
     dr = DatasetRepo()
     mobius_dataset = dr.get(dataset_name)
+    vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'relation']}
     dataset = []
     for i, doc in enumerate(mobius_dataset):
-        if i > 10:
+        if i > 1:
             break
         if verbose:
             print('Processing Doc:{}'.format(i))
@@ -68,10 +68,16 @@ def get_mobius_dataset(dataset_name, grammar, get_vector=spacy_get_vector, verbo
                 span2 = doc.annotations.span_annotations[span2_index]
                 if (span1.label.value, span2.label.value) in grammar.keys() or (span2.label.value, span1.label.value) in grammar.keys():
                     example = process_span_pair(span1, span2, doc)
+                    update_vocab(vocab, example)
                     dataset.append(example)
-    return dataset
+    return dataset, vocab
 
-
+def update_vocab(vocab, example):
+    vocab['text'].update(example['text'].split())
+    vocab['chars'].update(list(example['text']))
+    for key in example:
+        if key is not 'text':
+            vocab[key].update([example[key]])
 
 def process_span_pair(span1, span2, doc):
     text, words = get_text_and_tokens(span1, span2, doc)
@@ -111,33 +117,66 @@ def get_text_and_tokens(span1, span2, doc):
     text = ' '.join(tokens)
     return text, tokens
 
-def load_dataset(path):
+def example_generator(path, fields):
+    f = open(path + '/examples', 'r')
+    while True:
+        yield Example.fromJSON(f.readline(), fields)
+
+
+def load_dataset(path, binary=True):
+    vocab_count = pickle.load(open(path + '/vocab', 'rb'))
     text_field = Field(batch_first=True, include_lengths=True)
-    char_field = Field(tokenize=lambda x: list(x), batch_first=True, include_lengths=True)
+    text_field.vocab = Vocab(vocab_count['text'])
+    char_nesting_field = Field(batch_first=True, tokenize = list)
+    char_field = NestedField(char_nesting_field)
+    char_nesting_field.vocab = Vocab(vocab_count['chars'])
+    char_field.vocab = Vocab(vocab_count['chars'])
     pos1_field = Field(sequential=False, batch_first=True)
+    pos1_field.vocab = Vocab(vocab_count['pos1'])
     pos2_field = Field(sequential=False, batch_first=True)
-    label_field = Field(sequential=False, batch_first=True)
-    train_data = TabularDataset(path=path,
-                                          format='json',
-                                          fields={'text':[('text', text_field), ('chars', char_field)],
-                                                  'pos1':('pos1', pos1_field),
-                                                  'pos2':('pos2', pos2_field),
-                                                  'relation':('relation', label_field)})
-    text_field.build_vocab(train_data)
-    char_field.build_vocab(train_data)
+    pos2_field.vocab = Vocab(vocab_count['pos2'])
+    if binary:
+        label_field = Field(preprocessing=lambda x: str(bool(x!='NA')), sequential=False,
+                            batch_first=True)
+    else:
+        label_field = Field(sequential=False, batch_first=True)
+    label_field.vocab = Vocab(vocab_count['relation'])
+    fields_dict ={'text':[('text', text_field), ('chars', char_field)],
+            'pos1':('pos1', pos1_field),
+            'pos2':('pos2', pos2_field),
+            'relation':('relation', label_field)}
+    fields={'text':text_field,
+            'chars': char_field,
+            'pos1': pos1_field,
+            'pos2': pos2_field,
+            'relation':label_field}
+    print('Loading data from path {}...'.format(path))
+    examples = example_generator(path, fields_dict)
+    train_data = Dataset(examples, fields)
     return train_data
 
-def write_dataset(dataset, path):
-    f = open(path, 'w')
+
+def write_dataset(dataset, vocab, path):
+    f = open(path + '/examples', 'w')
     for ex in dataset:
         f.write(json.dumps(ex) + '\n')
     f.close()
+    pickle.dump(vocab, open(path + '/vocab', 'wb'))
 
 
 if __name__ == '__main__':
-    #nre_dataset = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
-    #write_dataset(nre_dataset, 'mimic/torchtest.json')
-    train_data = load_dataset('mimic/torchtest.json')
+    #nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
+    #write_dataset(nre_dataset, nre_vocab, 'tmp')
+    train_data = load_dataset('tmp')
+    iterator = BucketIterator(
+        train_data, batch_size=5, shuffle=False,
+        device=-1)
+    for i, batch in enumerate(iterator):
+        if i>5:
+            break
+        print(batch)
+
+
 
 
 
