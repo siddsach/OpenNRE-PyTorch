@@ -200,7 +200,7 @@ def load_dataset(path, binary=True):
     vocab_count = pickle.load(open(path + '/vocab', 'rb'))
     text_field = Field(batch_first=True, include_lengths=True, tokenize = lambda x: x.split(' '))
     text_field.vocab = Vocab(vocab_count['text'])
-    #text_field.vocab.load_vectors('fasttext.en.300d')
+    text_field.vocab.load_vectors('fasttext.en.300d')
     char_nesting_field = Field(batch_first=True, tokenize = list)
     char_field = NestedField(char_nesting_field, tokenize = lambda x: x.split(' '))
     char_nesting_field.vocab = Vocab(vocab_count['chars'])

@@ -40,7 +40,7 @@ class Accuracy(object):
         self.total = 0
 
 class Config(object):
-    def __init__(self):
+    def __init__(self,  lr, wd, embed_pos, embed_char):
         self.acc_NA = Accuracy()
         self.acc_not_NA = Accuracy()
         self.acc_total = Accuracy()
@@ -56,12 +56,12 @@ class Config(object):
 
         # Bool options
         self.use_gpu = True
-        self.embed_pos = True
-        self.embed_char = False
+        self.embed_pos = embed_pos
+        self.embed_char = embed_char
         self.is_training = True
 
         self.max_length = 120
-        self.num_classes = 4
+        self.num_classes = 3
         self.hidden_size = 230
         if self.embed_pos:
             self.pos_size = 5
@@ -76,8 +76,8 @@ class Config(object):
         self.max_epoch = 15
         self.opt_method = 'SGD'
         self.optimizer = None
-        self.learning_rate = 0.005
-        self.weight_decay = 1e-5
+        self.learning_rate = lr
+        self.weight_decay = wd
         self.drop_prob = 0.5
         self.checkpoint_dir = './checkpoint'
         self.test_result_dir = './test_result'
@@ -158,8 +158,10 @@ class Config(object):
         if self.embed_char:
             self.embed_size += self.char_size
 
-    def set_train_model(self, model):
+    def set_train_model(self, model, lr, wd):
         print("Initializing training model...")
+        self.learning_rate = lr
+        self.weight_decay = wd
         self.model = model
         self.trainModel = self.model(config = self)
         if self.pretrain_model != None:
@@ -262,7 +264,7 @@ class Config(object):
         self.optimizer.step()
         for i, prediction in enumerate(output):
             label = batch.relation[i].data.item()
-            if batch.relation[i] == NA_LABEL_INDEX:
+            if label == NA_LABEL_INDEX:
                 self.acc_NA.add(prediction == label)
             else:
                 b = prediction == label
