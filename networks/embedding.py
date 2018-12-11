@@ -19,13 +19,8 @@ class Embedding(nn.Module):
             self.word_embedding.weight.data.copy_(self.config.data_word_vec)
 
     def forward(self, word, pos1, pos2, chars):
-        print('here')
-        print(word.shape)
-        print(pos1.shape)
-        print(pos2.shape)
         word_emb = self.word_embedding(word)
         if self.config.embed_pos:
-            print('EMBED POS')
             pos_emb = self.pos_embedding(pos1, pos2)
         else:
             print('DONT EMBED POS')
@@ -36,7 +31,6 @@ class Embedding(nn.Module):
             char_emb = None
         l = [word_emb, pos_emb, char_emb]
         all_embeds = [x for x in l if x is not None]
-        print([x.shape for x in all_embeds])
         embedding = torch.cat(all_embeds, dim = 2)
         return embedding
 
@@ -66,13 +60,6 @@ class PositionEmbedding(nn.Module):
 
     def forward(self, pos1, pos2):
         pos1_emb = self.pos1_embedding(pos1)
-        for i in range(pos2.size(0)):
-            row = pos2[i, :]
-            try:
-                self.pos2_embedding(row)
-            except:
-                print(row)
-                print(self.pos2_embedding)
         pos2_emb = self.pos2_embedding(pos2)
         embedding = torch.cat((pos1_emb, pos2_emb), dim = 2)
         return embedding
@@ -89,6 +76,7 @@ class CharacterEmbedding(nn.Module):
         self.cnn = nn.Conv1d(self.in_channels, self.out_channels, self.kernel_size, padding=self.padding)
         self.pooling = nn.MaxPool1d(self.config.max_word_length)
         self.activation = nn.ReLU()
+        self.drop = nn.Dropout(p=self.config.drop_prob)
 
     def forward(self, chars):
         mask = chars != 0

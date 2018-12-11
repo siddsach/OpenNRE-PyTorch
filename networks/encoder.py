@@ -43,6 +43,7 @@ class PCNN(nn.Module):
         self.cnn = _CNN(config)
         self.pooling = _PiecewisePooling()
         self.activation = nn.ReLU()
+        #self.drop = nn.Dropout(p=self.config.drop_prob)
     def forward(self, embedding, mask):
         embedding = torch.unsqueeze(embedding, dim = 1)
         x = self.cnn(embedding)
@@ -56,12 +57,9 @@ class CNN(nn.Module):
         self.cnn = _CNN(config)
         self.pooling = _MaxPooling()
         self.activation = nn.ReLU()
+        #self.drop = nn.Dropout(p=self.config.drop_prob)
     def forward(self, embedding, mask=None):
         embedding = torch.unsqueeze(embedding, dim = 1)
-        print('EMBEDDING')
-        print(embedding.shape)
-        print('CNN')
-        print(self.cnn)
         x = self.cnn(embedding)
         x = self.pooling(x, self.config.hidden_size)
         return self.activation(x)
@@ -71,6 +69,7 @@ class MyRNN(nn.Module):
         super(MyRNN, self).__init__()
         self.config = config
         self.rnn = nn.GRU(input_size=self.config.embed_size, hidden_size=self.config.hidden_size, batch_first=True)
+        self.drop = nn.Dropout(p=self.config.drop_prob)
 
     def forward(self, embedding, mask):
         _, hidden = self.rnn(embedding)

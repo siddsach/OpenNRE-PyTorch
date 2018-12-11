@@ -14,7 +14,7 @@ import sklearn.metrics
 from tqdm import tqdm
 from process_mobius import load_dataset
 
-NA_LABEL_INDEX = 0
+NA_LABEL_INDEX = 1
 
 def to_var(x):
     if torch.cuda.is_available():
@@ -76,7 +76,7 @@ class Config(object):
         self.max_epoch = 15
         self.opt_method = 'SGD'
         self.optimizer = None
-        self.learning_rate = 0.5
+        self.learning_rate = 0.005
         self.weight_decay = 1e-5
         self.drop_prob = 0.5
         self.checkpoint_dir = './checkpoint'
@@ -236,11 +236,6 @@ class Config(object):
         mask = torch.zeros(word.size(0), word.size(1), 3, dtype=torch.long)
         mask[:, :, 0] = (inds.le(pos_min)) * 100
         mask[:, :, 1] = (inds.gt(pos_min) * inds.le(pos_max)) * 100
-        print('pos')
-        print(pos_max.shape)
-        print('i')
-        print(inds.shape)
-        print('l')
         length = length.unsqueeze(1).expand_as(inds)
         if length is not None:
             g = inds.gt(pos_max)
@@ -255,8 +250,6 @@ class Config(object):
         words, length = batch.text
         #mask = self.get_mask(words, batch.pos1, batch.pos2, length)
         self.optimizer.zero_grad()
-        print('POS1')
-        print(batch.pos1.shape)
         logits = self.trainModel(words,
                                  batch.pos1,
                                  batch.pos2,
@@ -268,10 +261,11 @@ class Config(object):
         loss.backward()
         self.optimizer.step()
         for i, prediction in enumerate(output):
+            label = batch.relation[i].data.item()
             if batch.relation[i] == NA_LABEL_INDEX:
-                self.acc_NA.add(prediction == batch.relation[i])
+                self.acc_NA.add(prediction == label)
             else:
-                b = prediction == batch.relation[i]
+                b = prediction == label
                 self.acc_not_NA.add(b)
             self.acc_total.add(prediction == batch.relation[i])
         return loss.data[0]
