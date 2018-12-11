@@ -28,11 +28,20 @@ def find_pos(words, span1, span2):
     pos1 = -1
     pos2 = -1
     for i, tok in enumerate(words):
-        if tok.start >= span1.start and tok.end <= span1.end:
+        if tok.end >= span1.start and tok.start <= span1.end:
             pos1 = num_tokens
-        elif tok.start >= span2.start and tok.end <= span2.end:
+        if tok.end >= span2.start and tok.start <= span2.end:
             pos2 = num_tokens
         num_tokens += 1
+
+    if pos1 is -1 or pos2 is -1:
+        print('CANT FIND')
+        print(pos1)
+        print(pos2)
+        print(span1)
+        print(span2)
+        print([(x.text, x.start, x.end) for x in words])
+        assert False
     return pos1, pos2
 
 '''
