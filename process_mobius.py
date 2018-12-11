@@ -8,10 +8,11 @@ from torchtext.data import Dataset, Field, NestedField, Example, BucketIterator
 from torchtext.vocab import Vocab
 from collections import Counter
 import pickle
+import numpy as np
 
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-MIMIC_DATASET = '/efs/sid/mobius_data/train.jsonl.gz'
-OUTPUT_PATH = 'mimic_train'
+MIMIC_DATASET = '/Users/sidsachdeva/roam/data/train.jsonl.gz'
+OUTPUT_PATH = 'tmp/train'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
                  ('DURATION', 'DRUG'): 'DURATION-DRUG',
@@ -89,6 +90,8 @@ def get_mobius_dataset(dataset_path, grammar, verbose=True):
     mobius_dataset = s.load(dataset_path)
     vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'relation']}
     dataset = []
+    n_t = 0
+    n_f = 0
     for i, doc in enumerate(mobius_dataset):
         if verbose:
             print('Processing Doc:{}'.format(i))
@@ -100,8 +103,11 @@ def get_mobius_dataset(dataset_path, grammar, verbose=True):
                 if (span1.label.value, span2.label.value) in grammar.keys() or (span2.label.value, span1.label.value) in grammar.keys():
                     example = process_span_pair(span1, span2, doc)
                     if example is not None:
-                        update_vocab(vocab, example)
-                        dataset.append(example)
+                        if example['relation'] or np.random.uniform() > 0.97:
+
+                            update_vocab(vocab, example)
+                            dataset.append(example)
+
     return dataset, vocab
 
 def update_vocab(vocab, example):
@@ -194,6 +200,7 @@ def load_dataset(path, binary=True):
     vocab_count = pickle.load(open(path + '/vocab', 'rb'))
     text_field = Field(batch_first=True, include_lengths=True, tokenize = lambda x: x.split(' '))
     text_field.vocab = Vocab(vocab_count['text'])
+    #text_field.vocab.load_vectors('fasttext.en.300d')
     char_nesting_field = Field(batch_first=True, tokenize = list)
     char_field = NestedField(char_nesting_field, tokenize = lambda x: x.split(' '))
     char_nesting_field.vocab = Vocab(vocab_count['chars'])
@@ -236,3 +243,5 @@ if __name__ == '__main__':
     nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
     write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH)
     train_data = load_dataset(OUTPUT_PATH)
+    for x in train_data.examples:
+        print(x.relation)
