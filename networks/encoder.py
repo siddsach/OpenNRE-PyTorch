@@ -57,12 +57,12 @@ class CNN(nn.Module):
         self.cnn = _CNN(config)
         self.pooling = _MaxPooling()
         self.activation = nn.ReLU()
-        #self.drop = nn.Dropout(p=self.config.drop_prob)
+        self.drop = nn.Dropout(p=self.config.drop_prob)
     def forward(self, embedding, mask=None):
         embedding = torch.unsqueeze(embedding, dim = 1)
         x = self.cnn(embedding)
         x = self.pooling(x, self.config.hidden_size)
-        return self.activation(x)
+        return self.drop(self.activation(x))
 
 class MyRNN(nn.Module):
     def __init__(self, config):
