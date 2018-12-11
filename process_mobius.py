@@ -10,7 +10,8 @@ from collections import Counter
 import pickle
 
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-MIMIC_DATASET = '/Users/sidsachdeva/roam/data/train.jsonl.gz'
+MIMIC_DATASET = '/efs/sid/mobius_data/train.jsonl.gz'
+OUTPUT_PATH = 'mimic_train'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
                  ('DURATION', 'DRUG'): 'DURATION-DRUG',
@@ -80,8 +81,6 @@ def get_mobius_dataset(dataset_path, grammar, verbose=True):
     vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'relation']}
     dataset = []
     for i, doc in enumerate(mobius_dataset):
-        if i > 0:
-            break
         if verbose:
             print('Processing Doc:{}'.format(i))
         num_spans = len(doc.annotations.span_annotations)
@@ -226,11 +225,5 @@ def write_dataset(dataset, vocab, path):
 
 if __name__ == '__main__':
     nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
-    write_dataset(nre_dataset, nre_vocab, 'tmp/train')
-    train_data = load_dataset('tmp/train')
-    for x in train_data.examples:
-        print(x.relation)
-    train_iter = BucketIterator(train_data, batch_size=5, shuffle=False)
-    for i, x in enumerate(train_iter):
-        print(x.relation)
-
+    write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH)
+    train_data = load_dataset(OUTPUT_PATH)
