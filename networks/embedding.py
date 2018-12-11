@@ -13,20 +13,40 @@ class Embedding(nn.Module):
             self.pos_embedding = PositionEmbedding(config)
         if config.embed_char:
             self.char_embedding = CharacterEmbedding(config)
-        self.word_embedding = nn.Embedding(self.config.data_word_vec.shape[0], self.config.data_word_vec.shape[1])
-        self.init_word_weights()
 
-    def init_word_weights(self):
-        self.word_embedding.weight.data.copy_(torch.from_numpy(self.config.data_word_vec))
+        self.word_embedding = nn.Embedding(self.config.num_words, self.config.word_size)
+        if self.config.data_word_vec is not None:
+            self.word_embedding.weight.data.copy_(self.config.data_word_vec)
 
     def forward(self, word, pos1, pos2, chars):
+        print('here')
+        print(word.shape)
+        print(pos1.shape)
+        print(pos2.shape)
         word_emb = self.word_embedding(word)
-        if self.pos_embedding is not None:
+        if self.config.embed_pos:
+            print('EMBED POS')
             pos_emb = self.pos_embedding(pos1, pos2)
-        if self.char_embedding is not None:
+        else:
+            print('DONT EMBED POS')
+            pos_emb = None
+        if self.config.embed_char:
             char_emb = self.char_embedding(chars)
-        embedding = torch.cat((word_emb, pos_emb, char_emb), dim = 2)
+        else:
+            char_emb = None
+        l = [word_emb, pos_emb, char_emb]
+        all_embeds = [x for x in l if x is not None]
+        print([x.shape for x in all_embeds])
+        embedding = torch.cat(all_embeds, dim = 2)
         return embedding
+
+class PassEmbedding(nn.Module):
+    def __init__(self, config):
+        self.config
+
+    def forward(self, word, pos1, pos2, chars):
+        return word
+
 
 class PositionEmbedding(nn.Module):
     def __init__(self, config):
@@ -43,8 +63,16 @@ class PositionEmbedding(nn.Module):
         nn.init.xavier_uniform(self.pos2_embedding.weight.data)
         if self.pos2_embedding.padding_idx is not None:
             self.pos2_embedding.weight.data[self.pos2_embedding.padding_idx].fill_(0)
+
     def forward(self, pos1, pos2):
         pos1_emb = self.pos1_embedding(pos1)
+        for i in range(pos2.size(0)):
+            row = pos2[i, :]
+            try:
+                self.pos2_embedding(row)
+            except:
+                print(row)
+                print(self.pos2_embedding)
         pos2_emb = self.pos2_embedding(pos2)
         embedding = torch.cat((pos1_emb, pos2_emb), dim = 2)
         return embedding

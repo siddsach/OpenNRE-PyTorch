@@ -58,6 +58,10 @@ class CNN(nn.Module):
         self.activation = nn.ReLU()
     def forward(self, embedding, mask=None):
         embedding = torch.unsqueeze(embedding, dim = 1)
+        print('EMBEDDING')
+        print(embedding.shape)
+        print('CNN')
+        print(self.cnn)
         x = self.cnn(embedding)
         x = self.pooling(x, self.config.hidden_size)
         return self.activation(x)
@@ -71,3 +75,18 @@ class MyRNN(nn.Module):
     def forward(self, embedding, mask):
         _, hidden = self.rnn(embedding)
         return torch.squeeze(hidden)
+
+class BertEncoder(nn.Module):
+    def __init__(self, config):
+        super(BertEncoder, self).__init__()
+        self.config = config
+        self.bert_encoder = BertModel.from_pretrained('bert-base-uncased')
+
+    def forward(self, word):
+        bert_ids = self.convert_to_bert(word)
+        _, pooled_output = self.bert_encoder(bert_ids)
+        return pooled_output
+
+    def convert_to_bert(self, word):
+        return [self.config.bert2id[x] for x in word]
+

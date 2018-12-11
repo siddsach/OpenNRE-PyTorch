@@ -26,6 +26,12 @@ class Selector(nn.Module):
     def test(self, x, scope):
         raise NotImplementedError
 
+# No Selector/Multi-instance learning.
+class FeedForward(Selector):
+    def forward(self, x, scope=None, attention_query=None, label=None):
+        return self.get_logits(x)
+
+
 class Attention(Selector):
     def _attention_train_logit(self, x, attention_query):
         relation_query = self.relation_matrix(attention_query)
