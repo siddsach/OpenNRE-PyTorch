@@ -143,7 +143,7 @@ def process_span_pair(span1, span2, doc):
             label = 'NA'
         assert len(text.split(' ')) == len(pos2_rel), (len(text.split(' ')), num_words)
         example = {'text': text, 'pos1':pos1_rel,
-                   'pos2': pos2_rel, 'relation': label}
+                   'pos2': pos2_rel, 'relation': (label!= 'NA')}
         return example
     else:
         return None
@@ -176,6 +176,12 @@ def relative_positions(pos, num_words):
     pos_rel = [(j - pos) for j in pos_rel]
     return pos_rel
 
+def proprocess(x):
+    b = x!='NA'
+    print('PREPROCESS')
+    print(b)
+    return str(bool(b))
+
 def load_dataset(path, binary=True):
     vocab_count = pickle.load(open(path + '/vocab', 'rb'))
     text_field = Field(batch_first=True, include_lengths=True, tokenize = lambda x: x.split(' '))
@@ -189,7 +195,7 @@ def load_dataset(path, binary=True):
     pos2_field = Field(sequential=True, batch_first=True)
     pos2_field.vocab = Vocab(vocab_count['pos2'])
     if binary:
-        label_field = Field(preprocessing=lambda x: str(bool(x!='NA')), sequential=False,
+        label_field = Field(sequential=False,
                             batch_first=True)
     else:
         label_field = Field(sequential=False, batch_first=True)
@@ -222,11 +228,9 @@ if __name__ == '__main__':
     nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
     write_dataset(nre_dataset, nre_vocab, 'tmp/train')
     train_data = load_dataset('tmp/train')
+    for x in train_data.examples:
+        print(x.relation)
     train_iter = BucketIterator(train_data, batch_size=5, shuffle=False)
     for i, x in enumerate(train_iter):
-        assert x.pos2.size(1) == x.text[0].size(1), (x.text[0].shape, x.pos2.shape)
-        print('batch {}'.format(i))
-        if torch.max(x.pos2) > len(train_data.fields['pos2'].vocab):
-            print(x.pos2)
-            assert False
+        print(x.relation)
 
