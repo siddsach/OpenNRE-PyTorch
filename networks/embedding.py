@@ -89,7 +89,7 @@ class CharacterEmbedding(nn.Module):
         back_mask = torch.zeros((mask.size(0), self.padding-1)).long()
         mask = torch.cat([front_mask, mask.long(), back_mask], dim=1)
         embed = embed.masked_fill_(mask.byte().unsqueeze(1),0)
-        embed = self.pooling(embed).reshape(chars.size(0), chars.size(1), -1)
+        embed = torch.max(embed, dim=2)[0].reshape(chars.size(0), chars.size(1), -1)
         embed = self.activation(embed)
         return embed
 
