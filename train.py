@@ -27,9 +27,19 @@ model = {
 	'cnn_ff': models.CNN_FF,
 	'pcnn_ff': models.PCNN_FF
 }
-con = config.Config()
-con.set_max_epoch(15)
-con.load_train_data()
-#con.load_test_data()
-con.set_train_model(model[args.model_name])
-con.train()
+embed_pos = [True, False]
+embed_char = [True, False]
+drop_embed = [True, False]
+drop_encode = [True, False]
+lrs = [0.01, 0.005, 0.001, 0.0005]
+wds = [1e-3,1e-4,1e-5,1e-6,1e-7]
+for lr in lrs:
+    for wd in wds:
+        for p in embed_pos:
+            for c in embed_char:
+                con = config.Config(lr, wd, p, c)
+                con.set_max_epoch(15)
+                con.load_train_data()
+                #con.load_test_data()
+                con.set_train_model(model[args.model_name])
+                con.train()
