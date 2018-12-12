@@ -14,7 +14,8 @@ import sklearn.metrics
 from tqdm import tqdm
 from process_mobius import load_dataset
 
-NA_LABEL_INDEX = 1
+NEG_LABEL = 0
+POS_LABEL = 2
 
 def to_var(x):
     if torch.cuda.is_available():
@@ -61,7 +62,6 @@ class Config(object):
         self.is_training = True
 
         self.max_length = 120
-        self.num_classes = 3
         self.hidden_size = 230
         if self.embed_pos:
             self.pos_size = 5
@@ -141,14 +141,18 @@ class Config(object):
         print('Loading data...')
         self.train_data = load_dataset(self.train_path)
         self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
-        self.pos_num = max(len(self.train_data.fields['pos1'].vocab), len(self.train_data.fields['pos2'].vocab))
-        #self.test_data = load_dataset(self.test_path)
-        #self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size)
+        self.test_data = load_dataset(self.test_path, vocab_path = self.train_path + '/vocab')
+        self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
+        self.pos_num = max(len(self.train_data.fields['pos1'].vocab),
+                           len(self.train_data.fields['pos2'].vocab),
+                           len(self.test_data.fields['pos1'].vocab),
+                           len(self.test_data.fields['pos2'].vocab))
 
         # Get vocab
         self.data_word_vec = self.train_data.fields['text'].vocab.vectors
         self.num_words = len(self.train_data.fields['text'].vocab)
         self.num_chars = len(self.train_data.fields['chars'].vocab)
+        self.num_classes = len(self.train_data.fields['relation'].vocab)
         self.word_size = self.data_word_vec.shape[1] if self.data_word_vec is not None else 300
 
         # Set embeddings given vocab
@@ -158,10 +162,8 @@ class Config(object):
         if self.embed_char:
             self.embed_size += self.char_size
 
-    def set_train_model(self, model, lr, wd):
+    def set_train_model(self, model):
         print("Initializing training model...")
-        self.learning_rate = lr
-        self.weight_decay = wd
         self.model = model
         self.trainModel = self.model(config = self)
         if self.pretrain_model != None:
@@ -262,29 +264,41 @@ class Config(object):
         _, output = torch.max(logits, dim = 1)
         loss.backward()
         self.optimizer.step()
-        for i, prediction in enumerate(output):
-            label = batch.relation[i].data.item()
-            if label == NA_LABEL_INDEX:
-                self.acc_NA.add(prediction == label)
+        output = [int(x.item()) for x in output]
+        gold = [batch.relation[i].data.item() for i in range(len(output))]
+        for label, pred in zip(gold, output):
+            if label == NEG_LABEL:
+                self.acc_NA.add(pred == label)
             else:
-                b = prediction == label
-                self.acc_not_NA.add(b)
-            self.acc_total.add(prediction == batch.relation[i])
+                self.acc_not_NA.add(pred == label)
+            self.acc_total.add(pred == label)
         return loss.data[0]
 
-    #def test_one_step(self):
-    #    word = to_var(self.batch_word)
-    #    chars = to_var(self.batch_chars)
-    #    pos1 = to_var(self.batch_pos1)
-    #    pos2 = to_var(self.batch_pos2)
-    #    mask = to_var(self.batch_mask)
-    #    scope = self.batch_scope
-    #    return self.testModel.test(word, pos1, pos2, chars, mask, scope)
+
+    def test_one_step(self, batch):
+        # TODO: Add length option (4th arg)
+        words, length = batch.text
+        #mask = self.get_mask(words, batch.pos1, batch.pos2, length)
+        logits = self.trainModel(words,
+                                 batch.pos1,
+                                 batch.pos2,
+                                 batch.relation,
+                                 batch.chars)
+                                 #mask)
+        _, output = torch.max(logits, dim = 1)
+        output = [x.item() for x in output]
+        gold = [batch.relation[i].data.item() for i in range(len(output))]
+        return gold, output
+
+    def metric(self, gold, pred):
+        p, r, f1, s = sklearn.metrics.precision_recall_fscore_support(
+                        gold, pred, pos_label=POS_LABEL, average='micro')
+        return {'precision': p, 'recall':r, 'f1': f1, 'support':s}
 
     def train(self):
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
-        best_auc = 0.0
+        best_f1 = 0.0
         best_p = None
         best_r = None
         best_epoch = 0
@@ -304,47 +318,35 @@ class Config(object):
                 path = os.path.join(self.checkpoint_dir, self.model.__name__ + '-' + str(epoch))
                 torch.save(self.trainModel.state_dict(), path)
                 print('Have saved model to ' + path)
-            #if (epoch + 1) % self.test_epoch == 0:
-            #    self.testModel = self.trainModel
-            #    auc, pr_x, pr_y = self.test_one_epoch()
-            #    if auc > best_auc:
-            #        best_auc = auc
-            #        best_p = pr_x
-            #        best_r = pr_y
-            #        best_epoch = epoch
+            if (epoch + 1) % self.test_epoch == 0:
+                print('Testing...')
+                self.testModel = self.trainModel
+                scores = self.test_one_epoch()
+                print(scores)
+                if scores['f1'] > best_f1:
+                    best_f1 = scores['f1']
+                    best_p = scores['precision']
+                    best_r = scores['recall']
+
         print("Finish training")
-        #print("Best epoch = %d | auc = %f" % (best_epoch, best_auc))
+        print("Best epoch = %d | f1 = %f" % (best_epoch, best_f1))
         print("Storing best result...")
         if not os.path.isdir(self.test_result_dir):
             os.mkdir(self.test_result_dir)
         np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_x.npy'), best_p)
         np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_y.npy'), best_r)
         print("Finish storing")
+
+
     def test_one_epoch(self):
-        test_score = []
-        for batch in tqdm(range(self.test_batches)):
-            self.get_test_batch(batch)
-            batch_score = self.test_one_step()
-            test_score = test_score + batch_score
-        test_result = []
-        for i in range(len(test_score)):
-            for j in range(1, len(test_score[i])):
-            #for j in range(1, self.data_test_label.shape[1]):
-                dts = self.data_test_label[i][j]
-                ts = test_score[i][j]
-                test_result.append([dts, ts])
-        test_result = sorted(test_result, key = lambda x: x[1])
-        test_result = test_result[::-1]
-        pr_x = []
-        pr_y = []
-        correct = 0
-        for i, item in enumerate(test_result):
-            correct += item[0]
-            pr_y.append(float(correct) / (i + 1))
-            pr_x.append(float(correct) / self.total_recall)
-        auc = sklearn.metrics.auc(x = pr_x, y = pr_y)
-        print("auc: ", auc)
-        return auc, pr_x, pr_y
+        labels, preds = [], []
+        for i, batch in enumerate(self.test_iter):
+            print('Test batch: {}'.format(i))
+            batch_labels, batch_preds = self.test_one_step(batch)
+            labels += batch_labels
+            preds += batch_preds
+
+        return self.metric(labels, preds)
     #def test(self):
     #    best_epoch = None
     #    best_auc = 0.0
