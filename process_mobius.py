@@ -9,7 +9,9 @@ from torchtext.vocab import Vocab
 from collections import Counter
 import pickle
 import numpy as np
+import os
 
+SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
 MIMIC_DATASET = '/Users/sidsachdeva/roam/data/train.jsonl.gz'
 OUTPUT_PATH = 'tmp/train'
@@ -93,6 +95,9 @@ def get_mobius_dataset(dataset_path, grammar, verbose=True):
     n_t = 0
     n_f = 0
     for i, doc in enumerate(mobius_dataset):
+        if SHORT:
+            if i > 0:
+                break
         if verbose:
             print('Processing Doc:{}'.format(i))
         num_spans = len(doc.annotations.span_annotations)
@@ -196,8 +201,11 @@ def proprocess(x):
     print(b)
     return str(bool(b))
 
-def load_dataset(path, binary=True):
-    vocab_count = pickle.load(open(path + '/vocab', 'rb'))
+def load_dataset(path, binary=True, vocab_path=None):
+    if vocab_path is None:
+        vocab_count = pickle.load(open(path + '/vocab', 'rb'))
+    else:
+        vocab_count = pickle.load(open(vocab_path, 'rb'))
     text_field = Field(batch_first=True, include_lengths=True, tokenize = lambda x: x.split(' '))
     text_field.vocab = Vocab(vocab_count['text'])
     text_field.vocab.load_vectors('fasttext.en.300d')
@@ -214,7 +222,7 @@ def load_dataset(path, binary=True):
                             batch_first=True)
     else:
         label_field = Field(sequential=False, batch_first=True)
-    label_field.vocab = Vocab(vocab_count['relation'])
+    label_field.vocab = Vocab(vocab_count['relation'], specials=[])
     fields_dict = {'text':[('text', text_field), ('chars', char_field)],
             'pos1':('pos1', pos1_field),
             'pos2':('pos2', pos2_field),
@@ -231,6 +239,8 @@ def load_dataset(path, binary=True):
 
 
 def write_dataset(dataset, vocab, path):
+    if not os.path.isdir(path):
+        os.mkdir(path)
     f = open(path + '/examples', 'w')
     f.write(str(len(dataset)) + '\n')
     for ex in dataset:
