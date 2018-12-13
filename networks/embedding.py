@@ -85,7 +85,7 @@ class CharacterEmbedding(nn.Module):
         embed = self.char_embed(embed).transpose(1, 2)
         embed.masked_fill_(mask.unsqueeze(1),0)
         embed = self.cnn(embed)
-        if torch.cuda.is_available()
+        if torch.cuda.is_available():
             front_mask = torch.ones((mask.size(0), self.padding-1)).long().cuda()
             back_mask = torch.zeros((mask.size(0), self.padding-1)).long().cuda()
         else:
