@@ -13,7 +13,8 @@ import os
 
 SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
+#MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
+MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
 OUTPUT_PATH = 'output'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
@@ -90,7 +91,7 @@ def find_pos(sentence, head, tail):
 
 def get_mobius_dataset(dataset_path, grammar, verbose=True):
     datasets = {}
-    vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'pos1_rel', 'pos2_rel', 'relation']}
+    vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'pos1_rel', 'pos2_rel', 'relation', 'rel_type']}
     for split in ['train', 'test']:
         s = DatasetJsonlSerializer()
         mobius_dataset = s.load(dataset_path+'/{}.jsonl.gz'.format(split))
@@ -108,11 +109,16 @@ def get_mobius_dataset(dataset_path, grammar, verbose=True):
                 for span2_index in range(span1_index, num_spans):
                     span1 = doc.annotations.span_annotations[span1_index]
                     span2 = doc.annotations.span_annotations[span2_index]
-                    if (span1.label.value, span2.label.value) in grammar.keys() or (span2.label.value, span1.label.value) in grammar.keys():
+                    rel_type = None
+                    if (span1.label.value, span2.label.value) in grammar.keys():
+                        rel_type = grammar[(span1.label.value, span2.label.value)]
+                    elif (span2.label.value, span1.label.value) in grammar.keys():
+                        rel_type = grammar[(span2.label.value, span1.label.value)]
+                    if rel_type is not None:
                         example = process_span_pair(span1, span2, doc)
                         if example is not None:
-                            if example['relation'] or np.random.uniform() > 0.97:
-
+                            example['rel_type'] = rel_type
+                            if example['relation']:#or np.random.uniform() > 0.97:
                                 update_vocab(vocab, example)
                                 dataset.append(example)
 
@@ -225,18 +231,22 @@ def load_dataset(path, binary=True, vocab_path=None):
     else:
         label_field = Field(sequential=False, batch_first=True)
     label_field.vocab = Vocab(vocab_count['relation'], specials=[])
+    reltype_field = Field(batch_first=True, sequential=False)
+    reltype_field.vocab = Vocab(vocab_count['rel_type'])
     fields_dict = {'text':[('text', text_field), ('chars', char_field)],
             'pos1':('pos1', pos1_field),
             'pos2':('pos2', pos2_field),
             'pos1_rel':('pos1_rel', pos1_rel_field),
             'pos2_rel':('pos2_rel', pos2_field),
-            'relation':('relation', label_field)}
+            'relation':('relation', label_field),
+            'rel_type':('rel_type', reltype_field)}
     fields = {'text': text_field,
             'chars': char_field,
             'pos1': pos1_field,
             'pos2': pos2_field,
             'pos1_rel':pos1_rel_field,
             'pos2_rel':pos2_rel_field,
+            'rel_type':reltype_field,
             'relation':label_field}
     print('Loading data from path {}...'.format(path))
     train_examples = example_generator(path+'/train', fields_dict)

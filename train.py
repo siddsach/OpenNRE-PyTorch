@@ -33,6 +33,7 @@ drop_embed = [True, False]
 drop_encode = [True, False]
 lrs = [0.01, 0.005, 0.001, 0.0005]
 wds = [1e-3,1e-4,1e-5,1e-6,1e-7]
+results = {}
 for lr in lrs:
     for wd in wds:
         for p in embed_pos:
@@ -41,4 +42,5 @@ for lr in lrs:
                 con.load_data()
                 con.set_max_epoch(15)
                 con.set_train_model(model[args.model_name])
-                con.train()
+                results['lr-{},wd-{},pos-{},char-{}'.format(lr, wd, p, c)]= con.train()
+json.dump(results, open('results.json', 'w'))
