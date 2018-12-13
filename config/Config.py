@@ -71,7 +71,7 @@ class Config(object):
             self.char_size = 100
         else:
             self.char_size = 0
-        self.pretrained_wordvec = 'fasttext.en.300d'
+        self.pretrained_wordvec = 'glove.200d.6B' #'fasttext.en.300d'
         self.char_window_size = 3
         self.max_word_length = 50
         self.max_epoch = 15
