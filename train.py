@@ -38,9 +38,13 @@ for lr in lrs:
     for wd in wds:
         for p in embed_pos:
             for c in embed_char:
-                con = config.Config(lr, wd, p, c)
-                con.load_data()
-                con.set_max_epoch(15)
-                con.set_train_model(model[args.model_name])
-                results['lr-{},wd-{},pos-{},char-{}'.format(lr, wd, p, c)]= con.train()
+                for model_name in ['pcnn_ff', 'cnn_ff', 'rnn_ff']:
+                    try:
+                        con = config.Config(lr, wd, p, c)
+                        con.load_data()
+                        con.set_max_epoch(15)
+                        con.set_train_model(model[model_name])
+                        results['lr-{},wd-{},pos-{},char-{},model-{}'.format(lr, wd, p, c, model_name)]= con.train()
+                    except:
+                        pass
 json.dump(results, open('results.json', 'w'))
