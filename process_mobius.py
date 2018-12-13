@@ -11,7 +11,7 @@ import pickle
 import numpy as np
 import os
 
-SHORT = True
+SHORT = False
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
 MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
 #MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
