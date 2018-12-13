@@ -24,7 +24,7 @@ class _PiecewisePooling(nn.Module):
     def __init(self):
         super(_PiecewisePooling, self).__init__()
     def forward(self, x, mask, hidden_size):
-        mask = torch.unsqueeze(mask, 1)
+        mask = torch.unsqueeze(mask, 1).float()
         x, _ = torch.max(mask + x, dim = 2)
         x = x - 100
         return x.view(-1, hidden_size * 3)

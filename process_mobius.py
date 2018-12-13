@@ -13,8 +13,8 @@ import os
 
 SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-OUTPUT_PATH = 'output'
-MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
+MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
+OUTPUT_PATH = MIMIC_DATASET
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
                  ('DURATION', 'DRUG'): 'DURATION-DRUG',
@@ -87,41 +87,45 @@ def find_pos(sentence, head, tail):
     return pos1, pos2
 '''
 
+
 def get_mobius_dataset(dataset_path, grammar, verbose=True):
-    s = DatasetJsonlSerializer()
-    mobius_dataset = s.load(dataset_path)
-    vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'relation']}
-    dataset = []
-    n_t = 0
-    n_f = 0
-    for i, doc in enumerate(mobius_dataset):
-        if SHORT:
-            if i > 0:
-                break
-        if verbose:
-            print('Processing Doc:{}'.format(i))
-        num_spans = len(doc.annotations.span_annotations)
-        for span1_index in range(num_spans-1):
-            for span2_index in range(span1_index, num_spans):
-                span1 = doc.annotations.span_annotations[span1_index]
-                span2 = doc.annotations.span_annotations[span2_index]
-                if (span1.label.value, span2.label.value) in grammar.keys() or (span2.label.value, span1.label.value) in grammar.keys():
-                    example = process_span_pair(span1, span2, doc)
-                    if example is not None:
-                        if example['relation'] or np.random.uniform() > 0.97:
+    datasets = {}
+    vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'pos1_rel', 'pos2_rel', 'relation']}
+    for split in ['train', 'test']:
+        s = DatasetJsonlSerializer()
+        mobius_dataset = s.load(dataset_path+'/{}.jsonl.gz'.format(split))
+        dataset = []
+        n_t = 0
+        n_f = 0
+        for i, doc in enumerate(mobius_dataset):
+            if SHORT:
+                if i > 0:
+                    break
+            if verbose:
+                print('Processing Doc:{}'.format(i))
+            num_spans = len(doc.annotations.span_annotations)
+            for span1_index in range(num_spans-1):
+                for span2_index in range(span1_index, num_spans):
+                    span1 = doc.annotations.span_annotations[span1_index]
+                    span2 = doc.annotations.span_annotations[span2_index]
+                    if (span1.label.value, span2.label.value) in grammar.keys() or (span2.label.value, span1.label.value) in grammar.keys():
+                        example = process_span_pair(span1, span2, doc)
+                        if example is not None:
+                            if example['relation'] or np.random.uniform() > 0.97:
 
-                            update_vocab(vocab, example)
-                            dataset.append(example)
+                                update_vocab(vocab, example)
+                                dataset.append(example)
 
-    return dataset, vocab
+        datasets[split] = dataset
+    return datasets, vocab
 
 def update_vocab(vocab, example):
     vocab['text'].update(example['text'].split())
     vocab['chars'].update(list(example['text']))
-    vocab['pos1'].update(example['pos1'])
-    vocab['pos2'].update(example['pos2'])
+    vocab['pos1'].update(example['pos1_rel'])
+    vocab['pos2'].update(example['pos2_rel'])
     for key in example:
-        if key not in ['text', 'pos1', 'pos2']:
+        if key not in ['text', 'pos1_rel', 'pos2_rel']:
             vocab[key].update([example[key]])
 
 def clean(word):
@@ -161,8 +165,8 @@ def process_span_pair(span1, span2, doc):
         if label is None:
             label = 'NA'
         assert len(text.split(' ')) == len(pos2_rel), (len(text.split(' ')), num_words)
-        example = {'text': text, 'pos1':pos1_rel,
-                   'pos2': pos2_rel, 'relation': (label!= 'NA')}
+        example = {'text': text, 'pos1':pos1, 'pos2':pos2, 'pos1_rel':pos1_rel,
+                   'pos2_rel': pos2_rel, 'relation': (label!= 'NA')}
         return example
     else:
         return None
@@ -202,20 +206,19 @@ def proprocess(x):
     return str(bool(b))
 
 def load_dataset(path, binary=True, vocab_path=None):
-    if vocab_path is None:
-        vocab_count = pickle.load(open(path + '/vocab', 'rb'))
-    else:
-        vocab_count = pickle.load(open(vocab_path, 'rb'))
+    vocab_count = pickle.load(open(path + '/vocab', 'rb'))
     text_field = Field(batch_first=True, include_lengths=True, tokenize = lambda x: x.split(' '))
     text_field.vocab = Vocab(vocab_count['text'])
     char_nesting_field = Field(batch_first=True, tokenize = list)
     char_field = NestedField(char_nesting_field, tokenize = lambda x: x.split(' '))
     char_nesting_field.vocab = Vocab(vocab_count['chars'])
     char_field.vocab = Vocab(vocab_count['chars'])
-    pos1_field = Field(sequential=True, batch_first=True)
-    pos1_field.vocab = Vocab(vocab_count['pos1'])
-    pos2_field = Field(sequential=True, batch_first=True)
-    pos2_field.vocab = Vocab(vocab_count['pos2'])
+    pos1_field = Field(batch_first=True, sequential=False, use_vocab=False)
+    pos2_field = Field(batch_first=True, sequential=False, use_vocab=False)
+    pos1_rel_field = Field(sequential=True, batch_first=True)
+    pos1_rel_field.vocab = Vocab(vocab_count['pos1_rel'])
+    pos2_rel_field = Field(sequential=True, batch_first=True)
+    pos2_rel_field.vocab = Vocab(vocab_count['pos2_rel'])
     if binary:
         label_field = Field(sequential=False,
                             batch_first=True)
@@ -225,31 +228,37 @@ def load_dataset(path, binary=True, vocab_path=None):
     fields_dict = {'text':[('text', text_field), ('chars', char_field)],
             'pos1':('pos1', pos1_field),
             'pos2':('pos2', pos2_field),
+            'pos1_rel':('pos1_rel', pos1_rel_field),
+            'pos2_rel':('pos2_rel', pos2_field),
             'relation':('relation', label_field)}
     fields = {'text': text_field,
             'chars': char_field,
             'pos1': pos1_field,
             'pos2': pos2_field,
+            'pos1_rel':pos1_rel_field,
+            'pos2_rel':pos2_rel_field,
             'relation':label_field}
     print('Loading data from path {}...'.format(path))
-    examples = example_generator(path, fields_dict)
-    train_data = Dataset(examples, fields)
-    return train_data
+    train_examples = example_generator(path+'/train', fields_dict)
+    train_data = Dataset(train_examples, fields)
+    test_examples = example_generator(path+'/test', fields_dict)
+    test_data = Dataset(test_examples, fields)
+    return train_data, test_data
 
 
 def write_dataset(dataset, vocab, path):
     if not os.path.isdir(path):
-        os.makedirs(path, exist_ok=True)
+        os.mkdir(path)
     f = open(path + '/examples', 'w')
     f.write(str(len(dataset)) + '\n')
     for ex in dataset:
         f.write(json.dumps(ex) + '\n')
     f.close()
-    pickle.dump(vocab, open(path + '/vocab', 'wb'))
 
 
 if __name__ == '__main__':
-    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET+'/train.jsonl.gz', MIMIC_GRAMMAR)
-    write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH +'/train')
-    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET+'/test.jsonl.gz', MIMIC_GRAMMAR)
-    write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH +'/test')
+    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
+    write_dataset(nre_dataset['train'], nre_vocab, OUTPUT_PATH+'/train')
+    write_dataset(nre_dataset['test'], nre_vocab, OUTPUT_PATH+'/test')
+    pickle.dump(nre_vocab, open(OUTPUT_PATH + '/vocab', 'wb'))
+    train_data, test_data = load_dataset(OUTPUT_PATH)
