@@ -71,7 +71,7 @@ class Config(object):
             self.char_size = 100
         else:
             self.char_size = 0
-        self.pretrained_wordvec = 'glove.200d.6B' #'fasttext.en.300d'
+        self.pretrained_wordvec = 'glove.6B.200d' #'fasttext.en.300d'
         self.char_window_size = 3
         self.max_word_length = 50
         self.max_epoch = 15
@@ -367,6 +367,8 @@ class Config(object):
             rel_types += [x.item() for x in batch.rel_type]
         breakdowns = [{'label':l, 'pred':p, 'type':r} for l, p, r in zip(labels, preds, rel_types)]
         scores = self.metric(labels, preds)
+        print('\n\n\n\n\n TEST SCORE\n\n\n\n\n')
+        print(scores)
         return scores, breakdowns
     #def test(self):
     #    best_epoch = None
