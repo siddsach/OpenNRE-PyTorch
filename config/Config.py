@@ -49,9 +49,9 @@ class Config(object):
         #self.use_bag = True
 
         # Set paths
-        #self.data_path = '/efs/sid/mobius_data/mimic/output'
+        self.data_path = '/efs/sid/mobius_data/mimic/output'
         #self.data_path = '/Users/sidsachdeva/roam/data/mimic'
-        self.data_path = 'output'
+        #self.data_path = 'output'
 
         # Set hyperparams
 
@@ -71,7 +71,7 @@ class Config(object):
             self.char_size = 100
         else:
             self.char_size = 0
-        self.pretrained_wordvec = None#'fasttext.en.300d'
+        self.pretrained_wordvec = 'fasttext.en.300d'
         self.char_window_size = 3
         self.max_word_length = 50
         self.max_epoch = 15
