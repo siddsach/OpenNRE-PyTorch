@@ -71,6 +71,7 @@ class Config(object):
             self.char_size = 100
         else:
             self.char_size = 0
+        self.pretrained_wordvec = 'glove.6B.50d'
         self.char_window_size = 3
         self.max_word_length = 50
         self.max_epoch = 15
@@ -140,6 +141,8 @@ class Config(object):
         # Load Data
         print('Loading data...')
         self.train_data = load_dataset(self.train_path)
+        if self.pretrained_wordvec is not None:
+            self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='/efs/sid/mobius_data/vectors')
         self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
         self.test_data = load_dataset(self.test_path, vocab_path = self.train_path + '/vocab')
         self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
@@ -341,7 +344,6 @@ class Config(object):
     def test_one_epoch(self):
         labels, preds = [], []
         for i, batch in enumerate(self.test_iter):
-            print('Test batch: {}'.format(i))
             batch_labels, batch_preds = self.test_one_step(batch)
             labels += batch_labels
             preds += batch_preds
