@@ -13,8 +13,8 @@ import os
 
 SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-#MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
-MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
+MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
+#MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
 OUTPUT_PATH = 'output'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
