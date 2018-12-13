@@ -49,9 +49,8 @@ class Config(object):
         #self.use_bag = True
 
         # Set paths
-        self.data_path = '/efs/sid/mobius_data/mimic/clean'
-        self.train_path = os.path.join(self.data_path, 'train')
-        self.test_path = os.path.join(self.data_path, 'test')
+        #self.data_path = '/efs/sid/mobius_data/mimic/clean'
+        self.data_path = '/Users/sidsachdeva/roam/data/mimic'
 
         # Set hyperparams
 
@@ -71,7 +70,7 @@ class Config(object):
             self.char_size = 100
         else:
             self.char_size = 0
-        self.pretrained_wordvec = 'fasttext.en.300d'
+        self.pretrained_wordvec = None#'fasttext.en.300d'
         self.char_window_size = 3
         self.max_word_length = 50
         self.max_epoch = 15
@@ -140,15 +139,19 @@ class Config(object):
     def load_data(self):
         # Load Data
         print('Loading data...')
-        self.train_data = load_dataset(self.train_path)
+        self.train_data, self.test_data = load_dataset(self.data_path)
+
+        #if self.pretrained_wordvec is not None:
+        #    self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='/efs/sid/mobius_data/vectors')
         if self.pretrained_wordvec is not None:
-            self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='/efs/sid/mobius_data/vectors')
-        self.test_data = load_dataset(self.test_path, vocab_path = self.train_path + '/vocab')
+            self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='vectors')
+
+        self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
         self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
-        self.pos_num = max(len(self.train_data.fields['pos1'].vocab),
-                           len(self.train_data.fields['pos2'].vocab),
-                           len(self.test_data.fields['pos1'].vocab),
-                           len(self.test_data.fields['pos2'].vocab))
+        self.pos_num = max(len(self.train_data.fields['pos1_rel'].vocab),
+                           len(self.train_data.fields['pos2_rel'].vocab),
+                           len(self.test_data.fields['pos1_rel'].vocab),
+                           len(self.test_data.fields['pos2_rel'].vocab))
 
         # Get vocab
         self.data_word_vec = self.train_data.fields['text'].vocab.vectors
@@ -156,6 +159,7 @@ class Config(object):
         self.num_chars = len(self.train_data.fields['chars'].vocab)
         self.num_classes = len(self.train_data.fields['relation'].vocab)
         self.word_size = self.data_word_vec.shape[1] if self.data_word_vec is not None else 300
+
 
         # Set embeddings given vocab
         self.embed_size = self.word_size
@@ -257,14 +261,14 @@ class Config(object):
     def train_one_step(self, batch):
         # TODO: Add length option (4th arg)
         words, length = batch.text
-        #mask = self.get_mask(words, batch.pos1, batch.pos2, length)
+        mask = self.get_mask(words, batch.pos1, batch.pos2, length)
         self.optimizer.zero_grad()
         logits = self.trainModel(words,
-                                 batch.pos1,
-                                 batch.pos2,
+                                 batch.pos1_rel,
+                                 batch.pos2_rel,
                                  batch.relation,
-                                 batch.chars)
-                                 #mask)
+                                 batch.chars,
+                                 mask)
         loss = self.loss(logits, batch.relation)
         _, output = torch.max(logits, dim = 1)
         loss.backward()
@@ -283,13 +287,13 @@ class Config(object):
     def test_one_step(self, batch):
         # TODO: Add length option (4th arg)
         words, length = batch.text
-        #mask = self.get_mask(words, batch.pos1, batch.pos2, length)
+        mask = self.get_mask(words, batch.pos1, batch.pos2, length)
         logits = self.trainModel(words,
-                                 batch.pos1,
-                                 batch.pos2,
+                                 batch.pos1_rel,
+                                 batch.pos2_rel,
                                  batch.relation,
-                                 batch.chars)
-                                 #mask)
+                                 batch.chars,
+                                 mask)
         _, output = torch.max(logits, dim = 1)
         output = [x.item() for x in output]
         gold = [batch.relation[i].data.item() for i in range(len(output))]

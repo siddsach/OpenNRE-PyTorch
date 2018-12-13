@@ -10,6 +10,9 @@ Keras-Preprocessing==1.0.5
 kiwisolver==1.0.1
 Markdown==3.0.1
 matplotlib==3.0.2
+boto==2.38.0
+boto3==1.9.62
+botocore==1.12.62
 mobiuscore
 mock==2.0.0
 numpy==1.15.4

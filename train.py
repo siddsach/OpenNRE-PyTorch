@@ -12,7 +12,7 @@ import argparse
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_name', type = str, default = 'cnn_ff', help = 'name of the model')
+parser.add_argument('--model_name', type = str, default = 'pcnn_ff', help = 'name of the model')
 args = parser.parse_args()
 model = {
 	'pcnn_att': models.PCNN_ATT,
