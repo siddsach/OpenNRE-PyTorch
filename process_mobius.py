@@ -13,8 +13,8 @@ import os
 
 SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-MIMIC_DATASET = '/Users/sidsachdeva/roam/data/train.jsonl.gz'
-OUTPUT_PATH = 'tmp/train'
+OUTPUT_PATH = 'output'
+MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
                  ('DURATION', 'DRUG'): 'DURATION-DRUG',
@@ -239,7 +239,7 @@ def load_dataset(path, binary=True, vocab_path=None):
 
 def write_dataset(dataset, vocab, path):
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
     f = open(path + '/examples', 'w')
     f.write(str(len(dataset)) + '\n')
     for ex in dataset:
@@ -249,8 +249,7 @@ def write_dataset(dataset, vocab, path):
 
 
 if __name__ == '__main__':
-    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
-    write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH)
-    train_data = load_dataset(OUTPUT_PATH)
-    for x in train_data.examples:
-        print(x.relation)
+    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET+'/train.jsonl.gz', MIMIC_GRAMMAR)
+    write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH +'/train')
+    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET+'/test.jsonl.gz', MIMIC_GRAMMAR)
+    write_dataset(nre_dataset, nre_vocab, OUTPUT_PATH +'/test')

@@ -49,7 +49,7 @@ class Config(object):
         #self.use_bag = True
 
         # Set paths
-        self.data_path = './tmp'
+        self.data_path = '/efs/sid/mobius_data/mimic/clean'
         self.train_path = os.path.join(self.data_path, 'train')
         self.test_path = os.path.join(self.data_path, 'test')
 
@@ -71,7 +71,7 @@ class Config(object):
             self.char_size = 100
         else:
             self.char_size = 0
-        self.pretrained_wordvec = 'glove.6B.50d'
+        self.pretrained_wordvec = 'fasttext.en.300d'
         self.char_window_size = 3
         self.max_word_length = 50
         self.max_epoch = 15
@@ -87,7 +87,7 @@ class Config(object):
         self.pretrain_model = None
         self.trainModel = None
         self.testModel = None
-        self.batch_size = 75
+        self.batch_size = 5
         self.window_size = 3
         self.epoch_range = None
         self.loss = nn.CrossEntropyLoss()
@@ -137,13 +137,12 @@ class Config(object):
     def set_epoch_range(self, epoch_range):
         self.epoch_range = epoch_range
 
-    def load_train_data(self):
+    def load_data(self):
         # Load Data
         print('Loading data...')
         self.train_data = load_dataset(self.train_path)
         if self.pretrained_wordvec is not None:
             self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='/efs/sid/mobius_data/vectors')
-        self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
         self.test_data = load_dataset(self.test_path, vocab_path = self.train_path + '/vocab')
         self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
         self.pos_num = max(len(self.train_data.fields['pos1'].vocab),
@@ -164,6 +163,9 @@ class Config(object):
             self.embed_size += (self.pos_size * 2)
         if self.embed_char:
             self.embed_size += self.char_size
+
+    def get_iterator(self, dataset):
+        return data.BucketIterator(dataset, batch_size=self.batch_size, shuffle=False)
 
     def set_train_model(self, model):
         print("Initializing training model...")
@@ -310,7 +312,8 @@ class Config(object):
             self.acc_NA.clear()
             self.acc_not_NA.clear()
             self.acc_total.clear()
-            for i, batch in enumerate(self.train_iter):
+            train_iter = self.get_iterator(self.train_data)
+            for i, batch in enumerate(train_iter):
                 loss = self.train_one_step(batch)
                 time_str = datetime.datetime.now().isoformat()
                 sys.stdout.write("\n\nepoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (epoch, i, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(), self.acc_total.get()))
@@ -330,6 +333,7 @@ class Config(object):
                     best_f1 = scores['f1']
                     best_p = scores['precision']
                     best_r = scores['recall']
+            self.load_data()
 
         print("Finish training")
         print("Best epoch = %d | f1 = %f" % (best_epoch, best_f1))

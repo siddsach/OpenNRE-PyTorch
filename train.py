@@ -38,8 +38,7 @@ for lr in lrs:
         for p in embed_pos:
             for c in embed_char:
                 con = config.Config(lr, wd, p, c)
+                con.load_data()
                 con.set_max_epoch(15)
-                con.load_train_data()
-                #con.load_test_data()
                 con.set_train_model(model[args.model_name])
                 con.train()
