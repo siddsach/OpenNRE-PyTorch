@@ -49,8 +49,9 @@ class Config(object):
         #self.use_bag = True
 
         # Set paths
-        self.data_path = '/efs/sid/mobius_data/mimic/output'
+        #self.data_path = '/efs/sid/mobius_data/mimic/output'
         #self.data_path = '/Users/sidsachdeva/roam/data/mimic'
+        self.data_path = 'output'
 
         # Set hyperparams
 
@@ -146,12 +147,8 @@ class Config(object):
         if self.pretrained_wordvec is not None:
             self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='vectors')
 
-        if torch.cuda.is_available():
-            self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False, device='cuda')
-            self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False, device='cuda')
-        else:
-            self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
-            self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
+        self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
+        self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
         self.pos_num = max(len(self.train_data.fields['pos1_rel'].vocab),
                            len(self.train_data.fields['pos2_rel'].vocab),
                            len(self.test_data.fields['pos1_rel'].vocab),
@@ -329,8 +326,8 @@ class Config(object):
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
         best_f1 = 0.0
-        best_p = None
-        best_r = None
+        best_scores = None
+        best_breakdown = None
         best_epoch = 0
         for epoch in range(self.max_epoch):
             print('Epoch ' + str(epoch) + ' starts...')
@@ -352,32 +349,25 @@ class Config(object):
             if (epoch + 1) % self.test_epoch == 0:
                 print('Testing...')
                 self.testModel = self.trainModel
-                scores = self.test_one_epoch()
-                print(scores)
+                scores, breakdown = self.test_one_epoch()
                 if scores['f1'] > best_f1:
-                    best_f1 = scores['f1']
-                    best_p = scores['precision']
-                    best_r = scores['recall']
+                    best_scores = scores
+                    best_breakdown = breakdown
             self.load_data()
+        return {'scores': best_scores, 'breakdown':best_breakdown}
 
-        print("Finish training")
-        print("Best epoch = %d | f1 = %f" % (best_epoch, best_f1))
-        print("Storing best result...")
-        if not os.path.isdir(self.test_result_dir):
-            os.mkdir(self.test_result_dir)
-        np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_x.npy'), best_p)
-        np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_y.npy'), best_r)
-        print("Finish storing")
 
 
     def test_one_epoch(self):
-        labels, preds = [], []
+        labels, preds, rel_types = [], [], []
         for i, batch in enumerate(self.test_iter):
             batch_labels, batch_preds = self.test_one_step(batch)
             labels += batch_labels
             preds += batch_preds
-
-        return self.metric(labels, preds)
+            rel_types += [x.item() for x in batch.rel_type]
+        breakdowns = [{'label':l, 'pred':p, 'type':r} for l, p, r in zip(labels, preds, rel_types)]
+        scores = self.metric(labels, preds)
+        return scores, breakdowns
     #def test(self):
     #    best_epoch = None
     #    best_auc = 0.0
