@@ -267,13 +267,22 @@ class Config(object):
         words, length = batch.text
         mask = self.get_mask(words, batch.pos1, batch.pos2, length)
         self.optimizer.zero_grad()
-        logits = self.trainModel(words,
-                                 batch.pos1_rel,
-                                 batch.pos2_rel,
-                                 batch.relation,
-                                 batch.chars,
-                                 mask)
-        loss = self.loss(logits, batch.relation)
+        if torch.cuda.is_available():
+            logits = self.trainModel(words.cuda(),
+                                     batch.pos1_rel.cuda(),
+                                     batch.pos2_rel.cuda(),
+                                     batch.relation.cuda(),
+                                     batch.chars.cuda(),
+                                     mask.cuda())
+            loss = self.loss(logits, batch.relation.cuda())
+        else:
+            logits = self.trainModel(words,
+                                     batch.pos1_rel,
+                                     batch.pos2_rel,
+                                     batch.relation,
+                                     batch.chars,
+                                     mask)
+            loss = self.loss(logits, batch.relation)
         _, output = torch.max(logits, dim = 1)
         loss.backward()
         self.optimizer.step()
@@ -292,12 +301,20 @@ class Config(object):
         # TODO: Add length option (4th arg)
         words, length = batch.text
         mask = self.get_mask(words, batch.pos1, batch.pos2, length)
-        logits = self.trainModel(words,
-                                 batch.pos1_rel,
-                                 batch.pos2_rel,
-                                 batch.relation,
-                                 batch.chars,
-                                 mask)
+        if torch.cuda.is_available():
+            logits = self.trainModel(words.cuda(),
+                                     batch.pos1_rel.cuda(),
+                                     batch.pos2_rel.cuda(),
+                                     batch.relation.cuda(),
+                                     batch.chars.cuda(),
+                                     mask.cuda())
+        else:
+            logits = self.trainModel(words,
+                                     batch.pos1_rel,
+                                     batch.pos2_rel,
+                                     batch.relation,
+                                     batch.chars,
+                                     mask)
         _, output = torch.max(logits, dim = 1)
         output = [x.item() for x in output]
         gold = [batch.relation[i].data.item() for i in range(len(output))]
