@@ -49,8 +49,8 @@ class Config(object):
         #self.use_bag = True
 
         # Set paths
-        #self.data_path = '/efs/sid/mobius_data/mimic/clean'
-        self.data_path = '/Users/sidsachdeva/roam/data/mimic'
+        self.data_path = '/efs/sid/mobius_data/mimic/output'
+        #self.data_path = '/Users/sidsachdeva/roam/data/mimic'
 
         # Set hyperparams
 
@@ -146,8 +146,12 @@ class Config(object):
         if self.pretrained_wordvec is not None:
             self.train_data.fields['text'].vocab.load_vectors(self.pretrained_wordvec, cache='vectors')
 
-        self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
-        self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
+        if torch.cuda.is_available():
+            self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False, device='cuda')
+            self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False, device='cuda')
+        else:
+            self.train_iter = data.BucketIterator(self.train_data, batch_size=self.batch_size, shuffle=False)
+            self.test_iter = data.BucketIterator(self.test_data, batch_size=self.batch_size, shuffle=False)
         self.pos_num = max(len(self.train_data.fields['pos1_rel'].vocab),
                            len(self.train_data.fields['pos2_rel'].vocab),
                            len(self.test_data.fields['pos1_rel'].vocab),

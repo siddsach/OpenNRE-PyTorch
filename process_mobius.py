@@ -13,8 +13,8 @@ import os
 
 SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
-OUTPUT_PATH = MIMIC_DATASET
+MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
+OUTPUT_PATH = 'output'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
                  ('DURATION', 'DRUG'): 'DURATION-DRUG',
@@ -246,9 +246,9 @@ def load_dataset(path, binary=True, vocab_path=None):
     return train_data, test_data
 
 
-def write_dataset(dataset, vocab, path):
+def write_dataset(dataset, path):
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
     f = open(path + '/examples', 'w')
     f.write(str(len(dataset)) + '\n')
     for ex in dataset:
@@ -258,7 +258,7 @@ def write_dataset(dataset, vocab, path):
 
 if __name__ == '__main__':
     nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
-    write_dataset(nre_dataset['train'], nre_vocab, OUTPUT_PATH+'/train')
-    write_dataset(nre_dataset['test'], nre_vocab, OUTPUT_PATH+'/test')
+    write_dataset(nre_dataset['train'], OUTPUT_PATH+'/train')
+    write_dataset(nre_dataset['test'], OUTPUT_PATH+'/test')
     pickle.dump(nre_vocab, open(OUTPUT_PATH + '/vocab', 'wb'))
     train_data, test_data = load_dataset(OUTPUT_PATH)
