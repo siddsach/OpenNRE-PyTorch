@@ -118,9 +118,8 @@ def get_mobius_dataset(dataset_path, grammar, verbose=True):
                         example = process_span_pair(span1, span2, doc)
                         if example is not None:
                             example['rel_type'] = rel_type
-                            if example['relation']:#or np.random.uniform() > 0.97:
-                                update_vocab(vocab, example)
-                                dataset.append(example)
+                            update_vocab(vocab, example)
+                            dataset.append(example)
 
         datasets[split] = dataset
     return datasets, vocab
