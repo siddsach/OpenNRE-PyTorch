@@ -6,26 +6,28 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 class Embedding(nn.Module):
-    def __init__(self, config):
+    def __init__(self, params):
         super(Embedding, self).__init__()
-        self.config = config
-        if config.embed_pos:
-            self.pos_embedding = PositionEmbedding(config)
-        if config.embed_char:
-            self.char_embedding = CharacterEmbedding(config)
+        self.params = params
+        if params['embed_pos']:
+            self.pos_embedding = PositionEmbedding(params)
+        if params['embed_char']:
+            self.char_embedding = CharacterEmbedding(params)
 
-        self.word_embedding = nn.Embedding(self.config.num_words, self.config.word_size)
-        if self.config.data_word_vec is not None:
-            self.word_embedding.weight.data.copy_(self.config.data_word_vec)
+        self.word_embedding = nn.Embedding(self.params['num_words'], self.params['word_size'])
+
+    def load_word_vectors(self, pretrained_wordvec):
+        assert pretrained_wordvec is not None
+        if pretrained_wordvec is not None:
+            self.word_embedding.weight.data.copy_(pretrained_wordvec)
 
     def forward(self, word, pos1, pos2, chars):
         word_emb = self.word_embedding(word)
-        if self.config.embed_pos:
+        if self.params['embed_pos']:
             pos_emb = self.pos_embedding(pos1, pos2)
         else:
-            print('DONT EMBED POS')
             pos_emb = None
-        if self.config.embed_char:
+        if self.params['embed_char']:
             char_emb = self.char_embedding(chars)
         else:
             char_emb = None
@@ -35,19 +37,19 @@ class Embedding(nn.Module):
         return embedding
 
 class PassEmbedding(nn.Module):
-    def __init__(self, config):
-        self.config
+    def __init__(self, params):
+        self.params
 
     def forward(self, word, pos1, pos2, chars):
         return word
 
 
 class PositionEmbedding(nn.Module):
-    def __init__(self, config):
+    def __init__(self, params):
         super(PositionEmbedding, self).__init__()
-        self.config = config
-        self.pos1_embedding = nn.Embedding(self.config.pos_num, self.config.pos_size, padding_idx = 0)
-        self.pos2_embedding = nn.Embedding(self.config.pos_num, self.config.pos_size, padding_idx = 0)
+        self.params = params
+        self.pos1_embedding = nn.Embedding(self.params['pos_num'], self.params['pos_size'], padding_idx = 0)
+        self.pos2_embedding = nn.Embedding(self.params['pos_num'], self.params['pos_size'], padding_idx = 0)
         self.init_pos_weights()
 
     def init_pos_weights(self):
@@ -65,18 +67,18 @@ class PositionEmbedding(nn.Module):
         return embedding
 
 class CharacterEmbedding(nn.Module):
-    def __init__(self, config):
+    def __init__(self, params):
         super(CharacterEmbedding, self).__init__()
-        self.config = config
+        self.params = params
         self.in_channels = 10
-        self.char_embed = nn.Embedding(self.config.num_chars, self.in_channels)
-        self.kernel_size = self.config.char_window_size
-        self.out_channels = self.config.char_size
+        self.char_embed = nn.Embedding(self.params['num_chars'], self.in_channels)
+        self.kernel_size = self.params['char_window_size']
+        self.out_channels = self.params['char_size']
         self.padding = self.kernel_size
         self.cnn = nn.Conv1d(self.in_channels, self.out_channels, self.kernel_size, padding=self.padding)
-        self.pooling = nn.MaxPool1d(self.config.max_word_length)
+        self.pooling = nn.MaxPool1d(self.params['max_word_length'])
         self.activation = nn.ReLU()
-        self.drop = nn.Dropout(p=self.config.drop_prob)
+        self.drop = nn.Dropout(p=self.params['drop_prob'])
 
     def forward(self, chars):
         mask = chars != 0

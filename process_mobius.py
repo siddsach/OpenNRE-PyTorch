@@ -1,6 +1,7 @@
 ####### Mobiuscore Data Processing ######
 from mobiuscore.dataset.serialize.json import DatasetJsonlSerializer
 from mobiuscore.doc.structures.sentence import Sentence
+from mobiuscore.doc.annotations.relation import Relation
 import spacy
 import json
 import torch
@@ -10,11 +11,12 @@ from collections import Counter
 import pickle
 import numpy as np
 import os
+import models
 
-SHORT = False
+SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
-MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
-#MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
+#MIMIC_DATASET = '/efs/sid/mobius_data/mimic'
+MIMIC_DATASET = '/Users/sidsachdeva/roam/data/mimic'
 OUTPUT_PATH = 'output'
 MIMIC_GRAMMAR = {('ADE', 'DRUG'): 'ADE-DRUG',
                  ('DOSAGE', 'DRUG'): 'DOSAGE-DRUG',
@@ -48,81 +50,40 @@ def find_pos(words, span1, span2):
         assert False
     return pos1, pos2
 
-'''
-def find_pos(sentence, head, tail):
-    # print("SENTENCE")
-    # print(sentence)
-    # print("HEAD")
-    # print(head)
-    # print('TAIL')
-    # print(tail)
-    # find index of entity
-    def find(sentence, entity):
-        p = sentence.find(' ' + entity + ' ')
-        if p == -1:
-            if sentence[:len(entity) + 1] == entity + ' ':
-                p = 0
-            elif sentence[-len(entity) - 1:] == ' ' + entity:
-                p = len(sentence) - len(entity)
-            else:
-                p = 0
-        else:
-            p += 1
-        return p
-
-    sentence = ' '.join(sentence.split())
-    p1 = find(sentence, head)
-    p2 = find(sentence, tail)
-    words = sentence.split()
-    num_words = len(words)
-    cur_pos = 0
-    pos1 = -1
-    pos2 = -1
-    # cur_pos is char index, pos1 pos2 are token index
-    for i, word in enumerate(words):
-        if cur_pos == p1:
-            pos1 = i
-        if cur_pos == p2:
-            pos2 = i
-        cur_pos += len(word) + 1
-    return pos1, pos2
-'''
-
-
-def get_mobius_dataset(dataset_path, grammar, verbose=True):
+def get_mobius_dataset(dataset_path, grammar=MIMIC_GRAMMAR, verbose=True):
     datasets = {}
     vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'pos1_rel', 'pos2_rel', 'relation', 'rel_type']}
     for split in ['train', 'test']:
         s = DatasetJsonlSerializer()
         mobius_dataset = s.load(dataset_path+'/{}.jsonl.gz'.format(split))
         dataset = []
-        n_t = 0
-        n_f = 0
         for i, doc in enumerate(mobius_dataset):
-            if SHORT:
-                if i > 0:
-                    break
+            if SHORT and i > 0:
+                break
             if verbose:
                 print('Processing Doc:{}'.format(i))
-            num_spans = len(doc.annotations.span_annotations)
-            for span1_index in range(num_spans-1):
-                for span2_index in range(span1_index, num_spans):
-                    span1 = doc.annotations.span_annotations[span1_index]
-                    span2 = doc.annotations.span_annotations[span2_index]
-                    rel_type = None
-                    if (span1.label.value, span2.label.value) in grammar.keys():
-                        rel_type = grammar[(span1.label.value, span2.label.value)]
-                    elif (span2.label.value, span1.label.value) in grammar.keys():
-                        rel_type = grammar[(span2.label.value, span1.label.value)]
-                    if rel_type is not None:
-                        example = process_span_pair(span1, span2, doc)
-                        if example is not None:
-                            example['rel_type'] = rel_type
-                            update_vocab(vocab, example)
-                            dataset.append(example)
-
+            for span1, span2, rel_type in span_pair_generator(doc):
+                example = process_span_pair(span1, span2, doc, rel_type)
+                if example is not None:
+                    update_vocab(vocab, example)
+                    dataset.append(example)
         datasets[split] = dataset
     return datasets, vocab
+
+
+def span_pair_generator(doc, grammar=MIMIC_GRAMMAR):
+    num_spans = len(doc.annotations.span_annotations)
+    for span1_index in range(num_spans-1):
+        for span2_index in range(span1_index, num_spans):
+            span1 = doc.annotations.span_annotations[span1_index]
+            span2 = doc.annotations.span_annotations[span2_index]
+            rel_type = None
+            if (span1.label.value, span2.label.value) in grammar.keys():
+                rel_type = grammar[(span1.label.value, span2.label.value)]
+            elif (span2.label.value, span1.label.value) in grammar.keys():
+                rel_type = grammar[(span2.label.value, span1.label.value)]
+            if rel_type is not None:
+                yield (span1, span2, rel_type)
 
 def update_vocab(vocab, example):
     vocab['text'].update(example['text'].split())
@@ -136,7 +97,7 @@ def update_vocab(vocab, example):
 def clean(word):
     return word.replace('\s', '')
 
-def process_span_pair(span1, span2, doc):
+def process_span_pair(span1, span2, doc, rel_type):
     sentences = get_sentences(span1, span2, doc)
     if sentences is not None:
         words = [word for sent in sentences for word in sent.tokens]
@@ -171,7 +132,8 @@ def process_span_pair(span1, span2, doc):
             label = 'NA'
         assert len(text.split(' ')) == len(pos2_rel), (len(text.split(' ')), num_words)
         example = {'text': text, 'pos1':pos1, 'pos2':pos2, 'pos1_rel':pos1_rel,
-                   'pos2_rel': pos2_rel, 'relation': (label!= 'NA')}
+                   'pos2_rel': pos2_rel, 'relation': (label!= 'NA'),
+                   'rel_type': rel_type}
         return example
     else:
         return None
@@ -190,6 +152,7 @@ def get_sentences(span1, span2, doc):
     else:
         return None
 
+
 def example_generator(path, fields):
     f = open(path + '/examples', 'r')
     num_ex = int(f.readline())
@@ -206,12 +169,32 @@ def relative_positions(pos, num_words):
 
 def proprocess(x):
     b = x!='NA'
-    print('PREPROCESS')
-    print(b)
     return str(bool(b))
 
 def load_dataset(path, binary=True, vocab_path=None):
+    print('Loading data from path {}...'.format(path))
     vocab_count = pickle.load(open(path + '/vocab', 'rb'))
+    print('Constructing Fields...')
+    fields_dict = make_fields(vocab_count)
+    fields = convert_fields(fields_dict)
+    print('Loading Examples...')
+    train_examples = example_generator(path+'/train', fields_dict)
+    train_data = Dataset(train_examples, fields)
+    test_examples = example_generator(path+'/test', fields_dict)
+    test_data = Dataset(test_examples, fields)
+    return train_data, test_data
+
+def convert_fields(inp_fields):
+    fields = {}
+    for v in inp_fields.values():
+        if isinstance(v, list):
+            for t in v:
+                fields[t[0]] = t[1]
+        else:
+            fields[v[0]] = v[1]
+    return fields
+
+def make_fields(vocab_count, binary=True):
     text_field = Field(batch_first=True, include_lengths=True, tokenize = lambda x: x.split(' '))
     text_field.vocab = Vocab(vocab_count['text'])
     char_nesting_field = Field(batch_first=True, tokenize = list)
@@ -236,23 +219,10 @@ def load_dataset(path, binary=True, vocab_path=None):
             'pos1':('pos1', pos1_field),
             'pos2':('pos2', pos2_field),
             'pos1_rel':('pos1_rel', pos1_rel_field),
-            'pos2_rel':('pos2_rel', pos2_field),
+            'pos2_rel':('pos2_rel', pos2_rel_field),
             'relation':('relation', label_field),
             'rel_type':('rel_type', reltype_field)}
-    fields = {'text': text_field,
-            'chars': char_field,
-            'pos1': pos1_field,
-            'pos2': pos2_field,
-            'pos1_rel':pos1_rel_field,
-            'pos2_rel':pos2_rel_field,
-            'rel_type':reltype_field,
-            'relation':label_field}
-    print('Loading data from path {}...'.format(path))
-    train_examples = example_generator(path+'/train', fields_dict)
-    train_data = Dataset(train_examples, fields)
-    test_examples = example_generator(path+'/test', fields_dict)
-    test_data = Dataset(test_examples, fields)
-    return train_data, test_data
+    return fields_dict
 
 
 def write_dataset(dataset, path):

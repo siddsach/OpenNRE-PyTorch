@@ -9,19 +9,16 @@ from networks.encoder import *
 from networks.selector import *
 
 class Model(nn.Module):
-    def __init__(self, config):
+    def __init__(self, params):
         super(Model, self).__init__()
-        self.config = config
-        self.embedding = Embedding(config)
+        self.params = params
+        self.embedding = Embedding(params)
         self.encoder = None
         self.selector = None
-    def forward(self, word, pos1, pos2, label, chars=None, mask=None, scope=None, attention_query=None):
+    def forward(self, word, pos1, pos2, chars=None, mask=None, label=None):
         embedding = self.embedding(word, pos1, pos2, chars)
         sen_embedding = self.encoder(embedding, mask)
-        logits = self.selector(sen_embedding, scope, attention_query, label)
+        logits = self.selector(sen_embedding, label)
         return logits
 
-    def test(self, word, pos1, pos2, chars, mask, scope):
-        embedding = self.embedding(word, pos1, pos2, chars)
-        sen_embedding = self.encoder(embedding, mask)
-        return self.selector.test(sen_embedding, scope)
+

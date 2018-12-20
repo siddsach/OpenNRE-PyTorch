@@ -6,14 +6,14 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 class Selector(nn.Module):
-    def __init__(self, config, relation_dim):
+    def __init__(self, params, relation_dim):
         super(Selector, self).__init__()
-        self.config = config
-        self.relation_matrix = nn.Embedding(self.config.num_classes, relation_dim)
-        self.bias = nn.Parameter(torch.Tensor(self.config.num_classes))
-        self.attention_matrix = nn.Embedding(self.config.num_classes, relation_dim)
+        self.params = params
+        self.relation_matrix = nn.Embedding(self.params['num_classes'], relation_dim)
+        self.bias = nn.Parameter(torch.Tensor(self.params['num_classes']))
+        self.attention_matrix = nn.Embedding(self.params['num_classes'], relation_dim)
         self.init_weights()
-        self.dropout = nn.Dropout(self.config.drop_prob)
+        self.dropout = nn.Dropout(self.params['drop_prob'])
     def init_weights(self):
         nn.init.xavier_uniform(self.relation_matrix.weight.data)
         nn.init.normal(self.bias)

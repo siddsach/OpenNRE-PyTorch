@@ -11,7 +11,7 @@ from networks.classifier import *
 from .Model import Model
 
 class PCNN_FF(Model):
-    def __init__(self, config):
-        super(PCNN_FF, self).__init__(config)
-        self.encoder = PCNN(config)
-        self.selector = FeedForward(config, config.hidden_size*3)
+    def __init__(self, params):
+        super(PCNN_FF, self).__init__(params)
+        self.encoder = PCNN(params)
+        self.selector = FeedForward(params, params['hidden_size']*3)

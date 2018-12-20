@@ -11,7 +11,7 @@ from networks.classifier import *
 from .Model import Model
 
 class RNN_FF(Model):
-    def __init__(self, config):
-        super(RNN_FF, self).__init__(config)
-        self.encoder = RNN(config)
-        self.selector = FeedForward(config, config.hidden_size)
+    def __init__(self, params):
+        super(RNN_FF, self).__init__(params)
+        self.encoder = RNN(params)
+        self.selector = FeedForward(params, params['hidden_size'])

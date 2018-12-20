@@ -11,7 +11,7 @@ from networks.classifier import *
 from .Model import Model
 
 class CNN_FF(Model):
-    def __init__(self, config):
-        super(CNN_FF, self).__init__(config)
+    def __init__(self, params):
+        super(CNN_FF, self).__init__(params)
         self.encoder = CNN(config)
-        self.selector = FeedForward(config, config.hidden_size)
+        self.selector = FeedForward(params, params['hidden_size'])
