@@ -3,6 +3,7 @@ from process_mobius import span_pair_generator, process_span_pair, make_fields, 
 from config.Config import get_mask
 from torchtext.data import Example
 from mobiuscore.doc.annotations.relation import Relation
+from mobiuscore.doc.annotations.label import Label
 from mobiuscore.dataset.serialize.json import DatasetJsonlSerializer
 import models
 import torch
@@ -24,12 +25,21 @@ def annotate(model, doc, inp_fields):
             data = [getattr(torch_ex, name)]
             for name, field in tgt_fields:
                 ex_tensors[name] = field.process(data)
+                print(name)
+                if type(ex_tensors[name]) is not tuple:
+                    print(ex_tensors[name].shape)
+                else:
+                    print(ex_tensors[name][0].shape)
         word, length = ex_tensors['text']
-        value = model(word=word,
+        mask = get_mask(word, ex_tensors['pos1'], ex_tensors['pos2'], length)
+        logits = model(word=word,
                     chars=ex_tensors['chars'],
-                    pos1=ex_tensors['pos1'],
-                    pos2=ex_tensors['pos2'],
+                    pos1=ex_tensors['pos1_rel'],
+                    pos2=ex_tensors['pos2_rel'],
+                    mask=mask
                 )
+        _, output = torch.max(logits, dim = 1)
+        output = [int(x.item()) for x in output]
         relation = Relation(source='nre',
                             label=Label(value=value),
                             annotation_from=span1,

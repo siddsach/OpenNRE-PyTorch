@@ -256,13 +256,13 @@ class Config(object):
                 params_path = os.path.join(model_path, 'params.json')
                 json.dump(self.params, open(params_path, 'w'))
                 print('Have saved model to ' + dir_path)
-            #if (epoch + 1) % self.params['test_epoch'] == 0:
-            #    print('Testing...')
-            #    self.testModel = self.trainModel
-            #    scores, breakdown = self.test_one_epoch()
-            #    if scores['f1'] > best_f1:
-            #        best_scores = scores
-            #        best_breakdown = breakdown
+            if (epoch + 1) % self.params['test_epoch'] == 0:
+                print('Testing...')
+                self.testModel = self.trainModel
+                scores, breakdown = self.test_one_epoch()
+                if scores['f1'] > best_f1:
+                    best_scores = scores
+                    best_breakdown = breakdown
             self.load_data()
         return {'scores': best_scores, 'breakdown':best_breakdown}
 

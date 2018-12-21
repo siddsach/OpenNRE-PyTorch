@@ -88,8 +88,8 @@ def span_pair_generator(doc, grammar=MIMIC_GRAMMAR):
 def update_vocab(vocab, example):
     vocab['text'].update(example['text'].split())
     vocab['chars'].update(list(example['text']))
-    vocab['pos1'].update(example['pos1_rel'])
-    vocab['pos2'].update(example['pos2_rel'])
+    vocab['pos1_rel'].update(example['pos1_rel'])
+    vocab['pos2_rel'].update(example['pos2_rel'])
     for key in example:
         if key not in ['text', 'pos1_rel', 'pos2_rel']:
             vocab[key].update([example[key]])
