@@ -13,8 +13,12 @@ class Embedding(nn.Module):
             self.pos_embedding = PositionEmbedding(params)
         if params['embed_char']:
             self.char_embedding = CharacterEmbedding(params)
+        if params['drop_word']:
+            self.drop = nn.Dropout(params['drop_word'])
 
         self.word_embedding = nn.Embedding(self.params['num_words'], self.params['word_size'])
+        if not params['tune_wordvec']:
+            self.word_embedding.weight.requires_grad = False
 
     def load_word_vectors(self, pretrained_wordvec):
         assert pretrained_wordvec is not None
@@ -23,6 +27,8 @@ class Embedding(nn.Module):
 
     def forward(self, word, pos1, pos2, chars):
         word_emb = self.word_embedding(word)
+        if self.params['drop_word']:
+            word_emb = self.drop(word_emb)
         if self.params['embed_pos']:
             pos_emb = self.pos_embedding(pos1, pos2)
         else:
@@ -78,7 +84,8 @@ class CharacterEmbedding(nn.Module):
         self.cnn = nn.Conv1d(self.in_channels, self.out_channels, self.kernel_size, padding=self.padding)
         self.pooling = nn.MaxPool1d(self.params['max_word_length'])
         self.activation = nn.ReLU()
-        self.drop = nn.Dropout(p=self.params['drop_prob'])
+        if params['drop_char'] is not None:
+            self.drop = nn.Dropout(params['drop_char'])
 
     def forward(self, chars):
         mask = chars != 0
@@ -97,5 +104,7 @@ class CharacterEmbedding(nn.Module):
         embed = embed.masked_fill_(mask.byte().unsqueeze(1),0)
         embed = torch.max(embed, dim=2)[0].reshape(chars.size(0), chars.size(1), -1)
         embed = self.activation(embed)
+        if self.params['drop_char']:
+            embed = self.drop(embed)
         return embed
 

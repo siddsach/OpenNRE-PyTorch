@@ -13,7 +13,6 @@ class Selector(nn.Module):
         self.bias = nn.Parameter(torch.Tensor(self.params['num_classes']))
         self.attention_matrix = nn.Embedding(self.params['num_classes'], relation_dim)
         self.init_weights()
-        self.dropout = nn.Dropout(self.params['drop_prob'])
     def init_weights(self):
         nn.init.xavier_uniform(self.relation_matrix.weight.data)
         nn.init.normal(self.bias)
@@ -21,7 +20,7 @@ class Selector(nn.Module):
     def get_logits(self, x):
         logits = torch.matmul(x, torch.transpose(self.relation_matrix.weight, 0, 1),) + self.bias
         return logits
-    def forward(self, x, scope):
+    def forward(self, x, scope=None):
         raise NotImplementedError
     def test(self, x, scope):
         raise NotImplementedError
@@ -50,7 +49,6 @@ class Attention(Selector):
             final_repre = torch.squeeze(torch.matmul(attention_score, sen_matrix))
             tower_repre.append(final_repre)
         stack_repre = torch.stack(tower_repre)
-        stack_repre = self.dropout(stack_repre)
         logits = self.get_logits(stack_repre)
         return logits
     def test(self, x, scope):
