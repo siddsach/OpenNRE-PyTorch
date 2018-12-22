@@ -40,7 +40,8 @@ DEFAULTS = {'embed_pos':True,
             'use_gpu': True,
             'is_training': True,
             'test_epoch': 1,
-            'save_epoch': 1}
+            'save_epoch': 1, 
+            'log_every': 5}
 
 
 def to_var(x):
@@ -236,12 +237,11 @@ class Config(object):
             self.acc_total.clear()
             train_iter = self.get_iterator(self.train_data)
             for i, batch in enumerate(train_iter):
-                if i > 2:
-                    break
                 loss = self.train_one_step(batch)
                 time_str = datetime.datetime.now().isoformat()
-                sys.stdout.write("\n\nepoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (epoch, i, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(), self.acc_total.get()))
-                sys.stdout.flush()
+                if i % self.params['log_every'] == 0:
+                     sys.stdout.write("\n\nepoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (epoch, i, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(), self.acc_total.get()))
+                     sys.stdout.flush()
             if (epoch + 1) % self.params['save_epoch'] == 0:
                 print('Epoch ' + str(epoch) + ' has finished')
                 print('Saving model...')
