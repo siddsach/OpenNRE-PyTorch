@@ -12,6 +12,7 @@ import pickle
 import numpy as np
 import os
 import models
+import argparse
 
 SHORT = True
 #MIMIC_DATASET = 'n2c2/train/tokenized_spacy'
@@ -55,7 +56,8 @@ def get_mobius_dataset(dataset_path, grammar=MIMIC_GRAMMAR, verbose=True):
     vocab = {f: Counter() for f in ['text', 'chars', 'pos1', 'pos2', 'pos1_rel', 'pos2_rel', 'relation', 'rel_type']}
     for split in ['train', 'test']:
         s = DatasetJsonlSerializer()
-        mobius_dataset = s.load(dataset_path+'/{}.jsonl.gz'.format(split))
+        split_path = os.path.join(dataset_path, '{}.jsonl.gz'.format(split))
+        mobius_dataset = s.load(split_path)
         dataset = []
         for i, doc in enumerate(mobius_dataset):
             if SHORT and i > 0:
@@ -236,7 +238,10 @@ def write_dataset(dataset, path):
 
 
 if __name__ == '__main__':
-    nre_dataset,  nre_vocab = get_mobius_dataset(MIMIC_DATASET, MIMIC_GRAMMAR)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--datapath', type = str, default = MIMIC_DATASET, help = 'path to jsonl files containing data')
+    args = parser.parse_args()
+    nre_dataset,  nre_vocab = get_mobius_dataset(args.datapath, MIMIC_GRAMMAR)
     write_dataset(nre_dataset['train'], OUTPUT_PATH+'/train')
     write_dataset(nre_dataset['test'], OUTPUT_PATH+'/test')
     pickle.dump(nre_vocab, open(OUTPUT_PATH + '/vocab', 'wb'))
