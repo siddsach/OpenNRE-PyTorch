@@ -1,30 +1,68 @@
-import config
+from process_mobius import span_pair_generator, process_span_pair, make_fields, \
+        MIMIC_DATASET, OUTPUT_PATH
+from config.Config import get_mask
+from torchtext.data import Example
+from mobiuscore.doc.annotations.relation import Relation
+from mobiuscore.doc.annotations.label import Label
+from mobiuscore.dataset.serialize.json import DatasetJsonlSerializer
 import models
-import numpy as np
-import os
-import time
-import datetime
+import torch
 import json
-from sklearn.metrics import average_precision_score
-import sys
 import os
-import argparse
+import pickle
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '4'
-parser = argparse.ArgumentParser()
-parser.add_argument('--model_name', type = str, default = 'pcnn_att', help = 'name of the model')
-args = parser.parse_args()
-model = {
-	'pcnn_att': models.PCNN_ATT,
-	'pcnn_one': models.PCNN_ONE,
-	'pcnn_ave': models.PCNN_AVE,
-	'cnn_att': models.CNN_ATT,
-	'cnn_one': models.CNN_ONE,
-	'cnn_ave': models.CNN_AVE
-}
-con = config.Config()
-con.set_max_epoch(15)
-con.load_test_data()
-con.set_test_model(model[args.model_name])
-con.set_epoch_range([7,12])
-con.test()
+def annotate(model, doc, inp_fields):
+    examples = []
+    for span1, span2, rel_type in span_pair_generator(doc):
+        example = process_span_pair(span1, span2, doc, rel_type)
+        if example is not None:
+            torch_ex = Example.fromdict(example, inp_fields)
+            ex_tensors = {}
+            for name in inp_fields:
+                tgt_fields = inp_fields[name]
+                if not isinstance(tgt_fields, list):
+                    tgt_fields = [tgt_fields]
+
+                data = [getattr(torch_ex, name)]
+                for name, field in tgt_fields:
+                    ex_tensors[name] = field.process(data)
+            word, length = ex_tensors['text']
+            mask = get_mask(word, ex_tensors['pos1'], ex_tensors['pos2'], length)
+            logits = model(word=word,
+                        chars=ex_tensors['chars'],
+                        pos1=ex_tensors['pos1_rel'],
+                        pos2=ex_tensors['pos2_rel'],
+                        mask=mask
+                    )
+            _, output = torch.max(logits, dim = 1)
+            output = [int(x.item()) for x in output]
+            relation = Relation(source='nre',
+                                label=Label(value=str(output[0])),
+                                annotation_from=span1,
+                                annotation_to=span2,
+                                doc=doc)
+            doc.add(relation)
+
+def load_model_checkpoint(path='checkpoint/PCNN_FF/models',
+                          hyperparams=None,
+                          model_type=models.PCNN_FF):
+    params = json.load(open(os.path.join(path, 'params.json')))
+    model = model_type(params)
+    state_dict = torch.load(os.path.join(path, 'Epoch-0'))
+    model.load_state_dict(state_dict)
+    return model
+
+def evaluate(dataset_path, vocab_path, model=None):
+    if model is None:
+        model = load_model_checkpoint()
+    s = DatasetJsonlSerializer()
+    test_dataset = s.load(dataset_path+'/{}.jsonl.gz'.format('test'))
+    vocab = pickle.load(open(vocab_path, 'rb'))
+    inp_fields = make_fields(vocab)
+    for i, doc in enumerate(test_dataset):
+        print('Annotating Doc: {}'.format(i))
+        annotate(model, doc, inp_fields)
+    #s.dump(test_dataset, '')
+
+if __name__ == '__main__':
+    evaluate(MIMIC_DATASET, OUTPUT_PATH+'/vocab', None)

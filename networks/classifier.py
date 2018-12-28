@@ -6,9 +6,9 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 class Classifier(nn.Module):
-    def __init__(self, config):
+    def __init__(self, params):
         super(Classifier, self).__init__()
-        self.config = config
+        self.params = params
         self.loss = nn.CrossEntropyLoss()
     def forward(self, logits, label):
         loss = self.loss(logits, label)
